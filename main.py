@@ -100,7 +100,7 @@ class CannonGame(Widget):
         self.tank = Tank()
         self.tank.color = (0, 1, 0, 1)  # Green color
         self.tank.size_hint = (None, None)
-        self.tank.pos = (200, 500)  # Center tank horizontally
+        self.tank.pos = (50, 500)  # Center tank horizontally
         self.tank.size = (cell_size, cell_size)
         self.add_widget(self.tank)  # Add tank widget to the game
         
@@ -131,7 +131,9 @@ class CannonGame(Widget):
             touching, rect2 = self.check_collision(rect1=self.tank, rect2=ground, gravity=gravity_force)
             if touching:
                 falling = False
-                self.tank.y = rect2[3]
+                if self.tank.y > rect2[3]:
+                    print("skipped from " + str(self.tank.y) + "to " + str(rect2[3]))
+                    self.tank.y = rect2[3]
             
             touching, rect2 = self.check_collision(rect1=self.tank, rect2=ground, speed = movement_distance)
             if "right" in self.keys_pressed and self.tank.x + self.tank.width + movement_distance < self.width and not touching:
@@ -144,7 +146,7 @@ class CannonGame(Widget):
             if "left" in self.keys_pressed and self.tank.x - movement_distance > 0 and not touching:
                 left = True
             elif touching:
-                self.tank.x = rect2[2]    
+                self.tank.x = rect2[2]+1 #the 1 one is to avoid intersection with the origin of the tank
                 
         if falling:
             self.tank.y -= gravity_force
@@ -189,7 +191,7 @@ class CannonGame(Widget):
 class CannonApp(App):
     def build(self):
         game = CannonGame()
-        Clock.schedule_interval(game.update, 1 / game.fps)  # Change the update rate to 60 times per second
+        Clock.schedule_interval(game.update, 1 / game.fps)
         return game
 
 
