@@ -216,6 +216,8 @@ class CannonGame(Widget):
                 falling = False
                 if self.tank.y > rect2[3]:
                     self.tank.y = rect2[3]
+                    if self.tank.x < 0:
+                        self.tank.x = 0
             
             touching, rect2 = self.check_collision(rect1=self.tank, rect2=ground, speed = movement_distance)
             if ("right" in self.keys_pressed or "d" in self.keys_pressed) and self.tank.x + self.tank.width + movement_distance < self.width and not touching:
@@ -245,8 +247,6 @@ class CannonGame(Widget):
         for bullet in bullet_group.children:
             bullet.trajectory() #move all the bullets
             
-        self.tank.shoot(bullet_group)
-
         
     def check_collision(self, rect1, rect2, gravity=0, speed=0):
         # Get the bounding boxes of the widgets
