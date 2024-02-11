@@ -95,13 +95,12 @@ class Bullet(Widget):
         self.bullet.pos = self.pos
         
     def trajectory(self):
-        self.x += self.speed + math.cos(math.radians(self.angle))
-        self.y += self.speed + math.cos(math.radians(self.angle)) - self.mass * self.flighttime
+        self.x += self.speed * math.cos(math.radians(self.angle))
+        self.y += self.speed * math.cos(math.radians(self.angle)) - self.mass * self.flighttime
         self.flighttime += 0.5
 
 
 #-------------------------------------------------------------------------class game-------------------------------------------------------------------------#
-        
 class CannonGame(Widget):
     tank = ObjectProperty(None)
     tank_speed = NumericProperty(10)  # Speed of the tank
@@ -175,7 +174,6 @@ class CannonGame(Widget):
             x += 1
         self.add_widget(ground_group)  # Add the ground group to the game widget
         
-        
     def create_tank(self, pos = (0, 200)):
         cell_size = min(self.width / self.grid_size_x, self.height / self.grid_size_y)
         self.tank = Tank()
@@ -194,7 +192,6 @@ class CannonGame(Widget):
         self.draw_background()  # Redraw the background
         self.terrain_gen()  # Redraw the grid
         self.create_tank()  # Create the tank
-
 
 
     def update(self, dt):
