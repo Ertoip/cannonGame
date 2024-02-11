@@ -215,20 +215,20 @@ class CannonGame(Widget):
             if touching:
                 falling = False
                 if self.tank.y > rect2[3]:
-                    self.tank.y = rect2[3]+2
+                    self.tank.y = rect2[3]
             
             touching, rect2 = self.check_collision(rect1=self.tank, rect2=ground, speed = movement_distance)
             if ("right" in self.keys_pressed or "d" in self.keys_pressed) and self.tank.x + self.tank.width + movement_distance < self.width and not touching:
                 right = True
             elif touching:    
-                self.tank.right = rect2[0] - 2
+                self.tank.right = rect2[0] - 3
 
                 
             touching, rect2 = self.check_collision(rect1=self.tank, rect2=ground, speed = -movement_distance)
             if ("left" in self.keys_pressed or "a" in self.keys_pressed) and self.tank.x - movement_distance > 0 and not touching:
                 left = True
             elif touching:
-                self.tank.x = rect2[2]+2 #the 1 one is to avoid intersection with the origin of the tank
+                self.tank.x = rect2[2]+3 #the 1 one is to avoid intersection with the origin of the tank
                 
         if falling:
             self.tank.y -= gravity_force
