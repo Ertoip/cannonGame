@@ -1,6 +1,6 @@
 from kivy.app import App
 from kivy.uix.widget import Widget
-from kivy.properties import NumericProperty, ObjectProperty
+from kivy.properties import NumericProperty, ObjectProperty, BooleanProperty
 from kivy.vector import Vector
 from kivy.clock import Clock
 from kivy.graphics import Rectangle, Color, PushMatrix, PopMatrix, Rotate, InstructionGroup, Line, Ellipse
@@ -8,6 +8,7 @@ from kivy.uix.button import Button
 from kivy.core.window import Window
 from kivy.core.window import Keyboard
 import math
+import random
 
 class Ground(Widget):
     pass
@@ -57,18 +58,24 @@ class Tank(Widget):
                             self.center_x + self.cannon_length * math.cos(self.cannon_angle),
                             self.center_y + self.cannon_length * math.sin(self.cannon_angle))
         
-    def shoot(self, BulletGroup, game):
+    def shoot(self, game):
+        weapon = game.weapons[game.current_weapon]
+
         bullet = Bullet()
         
         bullet.angle = self.cannon_angle
         bullet.pos = [self.center_x + self.cannon_length * math.cos(self.cannon_angle), self.center_y + self.cannon_length * math.sin(self.cannon_angle)]
-        bullet.color = (0.5, 0.5, 0.5, 1)  # Green color
-        bullet.diameter = self.cannon_length
-        bullet.speed = 5
-        bullet.speed = (bullet.speed/game.cell_size)*8
-        bullet.effect_diameter = 10
+        bullet.color = (0.5, 0.5, 0.5, 1)
         
-        BulletGroup.add(bullet)
+        bullet.effect_diameter = weapon.get("effect_diameter", None)
+        bullet.mass = weapon.get("mass", None)
+        bullet.speed = weapon.get("speed", None)*game.cell_size
+        bullet.diameter = weapon.get("diameter", None)*game.cell_size
+        bullet.drill = weapon.get("drill", None)
+        bullet.speed_falloff = weapon.get("speed_falloff", None)*game.cell_size
+        bullet.repeat_explosions = weapon.get("repeat_explosions", None)
+        
+        game.bullet_group.add(bullet)
         game.add_widget(bullet)
         
         
@@ -76,16 +83,18 @@ class Tank(Widget):
 
 class Bullet(Widget):
     mass = NumericProperty(1)
-    effect_diameter = NumericProperty(50)
-    speed = NumericProperty(1)
+    effect_diameter = NumericProperty(300)
+    speed = NumericProperty(2)
     flighttime = NumericProperty(0)
     angle = NumericProperty(0)
     diameter = NumericProperty(5)
+    drill = NumericProperty(0)
+    speed_falloff = NumericProperty(0.00)
+    repeat_explosions = BooleanProperty(False)
     
-    def __init__(self, **kwargs):
+    def __init__(self,**kwargs):
         super().__init__(**kwargs)
-        self.speed = self.speed * min(Window.width, Window.height) * 0.001 # Adjust speed based on screen size
-
+        
         with self.canvas:
             # Draw the bullet (circle)
             Color(0.4, 0.4, 0.4)
@@ -135,30 +144,28 @@ class Explosion(Widget):
 #-------------------------------------------------------------------------class game-------------------------------------------------------------------------#
 class CannonGame(Widget):
     tank = ObjectProperty(None)
-    tank_speed = NumericProperty(10)  # Speed of the tank
-    gravity = NumericProperty(10)
+    tank_speed = NumericProperty(20)  # Speed of the tank
+    gravity = NumericProperty(30)
     fps = NumericProperty(60)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         
-        self.grid_size_y = 50  # Define the size of the grid
-        self.grid_size_x = 120  # Define the size of the grid
+        self.grid_size_y = 50 # Define the size of the grid
+        self.grid_size_x = 200  # Define the size of the grid
         
         # Define the parameters for scaling
-        amplitude = 30  # Half of the peak-to-peak height (from -1 to 1)
-        offset = 0  # Offset to shift the function upwards to fit within [0, 10]
-
+        amplitude = 10  # Half of the peak-to-peak height (from -1 to 1)
+        frequency = 2
+        offset = 40
         # Calculate the heights using a sine function
         self.heights = []
         for x in range(self.grid_size_x):
             # Scale the sine function to fit within [0, 10]
-            y = math.sin(x * (2 * math.pi / self.grid_size_x)) * amplitude + offset
+            y = math.sin((x * (2 * math.pi / self.grid_size_x))*frequency) * amplitude + offset
+
+
             self.heights.append(round(y))  # Round the result to the nearest integer
-        
-        minh = min(self.heights)
-        for i in range(len(self.heights)):
-            self.heights[i] = int(self.heights[i] -minh + self.grid_size_y/3)            
         
         self.cell_size = min(self.width / self.grid_size_x, self.height / self.grid_size_y)
 
@@ -188,9 +195,39 @@ class CannonGame(Widget):
         self.mouse = Vector(Window.mouse_pos)  # Vector to store mouse position        
         self.bind(on_touch_down = self.onMousePressed)
         
-    def onMousePressed(self, instance, touch):
-        if touch.button == 'left':
-            self.tank.shoot(self.bullet_group, self)
+        #------------------------------------------------------------------------- Weapons -------------------------------------------------------------------------#
+        self.weapons = [{
+            "name": "Bullet",
+            "mass": 2,
+            "effect_diameter": 10,
+            "speed": 2,
+            "diameter": 1,
+            "drill": 0,
+            "speed_falloff": 0,
+            "repeat_explosions": False,
+        },
+        {
+            "name": "Bombshell",
+            "mass": 1,
+            "effect_diameter": 10,
+            "speed": 2,
+            "diameter": 1,
+            "drill": 10,
+            "speed_falloff": 0.2,
+            "repeat_explosions": False,
+        },
+        {
+            "name": "Ultimate weapon",
+            "mass": 0,
+            "effect_diameter": 30,
+            "speed": 5,
+            "diameter": 10,
+            "drill": 1000,
+            "speed_falloff": 0.0,
+            "repeat_explosions": True,
+        }]
+        
+        self.current_weapon = 0
 
 #-------------------------------------------------------------------------map generation-------------------------------------------------------------------------#
     def draw_background(self):
@@ -203,14 +240,14 @@ class CannonGame(Widget):
         # Generate terrain
         
         x_offset = (self.width - self.grid_size_x * self.cell_size) / 2
-        y_offset = (self.height - self.grid_size_y * self.cell_size) / 2
+        y_offset = 0
 
         x = 0
         # Create a group for ground objects
         while x < len(self.heights):
             for y in range(self.heights[x]):
                 ground = Ground()
-                ground_color = Color(0.6, 0.3, 0) if y+1 != self.heights[x] else Color(0.2, 1, 0.2) # set color
+                ground_color = Color(0.6, 0.3, 0) if y+3 < self.heights[x] else Color(0.2, 1, 0.2) # set color
                 ground.canvas.add(ground_color)
                 ground_pos_y = (y * self.cell_size) + y_offset
                 ground_rectangle = Rectangle(pos=((x * self.cell_size)+x_offset, ground_pos_y), size=(self.cell_size, self.cell_size))
@@ -227,7 +264,7 @@ class CannonGame(Widget):
         self.tank.color = (0, 1, 0, 1)  # Green color
         self.tank.size_hint = (None, None)
         self.tank.pos = (1, self.heights[0]*(self.cell_size+2)+(self.height - self.grid_size_y * self.cell_size) / 2)  # Center tank horizontally
-        self.tank.size = (self.cell_size*2, self.cell_size*2)
+        self.tank.size = (self.cell_size, self.cell_size)
         
         self.add_widget(self.tank)  # Add tank widget to the game
         
@@ -246,12 +283,11 @@ class CannonGame(Widget):
 
     def update(self, dt):
         # Calculate normalization factors based on the initial window size
-        normalization_factor_distance = self.width / self.initial_window_width  # for movement distance
         normalization_factor_gravity = self.height / self.initial_window_height  # for gravity force
 
         # Calculate movement distance based on normalized speed
-        movement_distance = self.tank_speed * normalization_factor_distance * dt
-        
+        movement_distance = self.tank_speed*self.cell_size*dt # Adjust speed based on screen size
+
         bullets_to_remove = []
         explosions_to_remove = []
         ground_to_remove = []
@@ -259,7 +295,7 @@ class CannonGame(Widget):
         falling = True #wheater the tank can fall or move
         right = False
         left = False
-        gravity_force = self.gravity * dt * normalization_factor_gravity
+        gravity_force = self.gravity*self.cell_size*dt
         
         for explosion in self.explosion_group:
             if explosion.diameter < explosion.effect_diameter:
@@ -270,12 +306,8 @@ class CannonGame(Widget):
         range_x = (self.tank.x - self.cell_size * 2, self.tank.x + self.cell_size * 2)
         range_y = (self.tank.y - self.cell_size * 2, self.tank.y + self.cell_size * 2)
         
-        #check collisions between tank and ground
-        c = 0
-        b = 0
         for ground in self.ground_tiles:
             if range_x[0] <= ground.x <= range_x[1] and range_y[0] <= ground.y <= range_y[1]:                
-                c+=1
                 touching, rect2 = self.check_collision(rect1=self.tank, rect2=ground, gravity=gravity_force)
                 if touching:
                     falling = False
@@ -320,15 +352,24 @@ class CannonGame(Widget):
 
             for ground in self.ground_tiles:
                 if (bullet_range_x[0] <= ground.x <= bullet_range_x[1]) and (bullet_range_y[0] <= ground.y <= bullet_range_y[1]):
-                    b += 1
                     touching, rect2 = self.check_collision(rect1=bullet, rect2=ground)
-                    if touching:
+                    if touching and bullet.drill <= 0:
                         bullets_to_remove.append(bullet)
+                        break  # No need to check further collisions for this bullet if it has already collided        
+                    elif touching and bullet.drill > 0:
+                        bullet.drill -= 1
+                        if bullet.speed > 0:
+                            bullet.speed -= bullet.speed_falloff
+                            if bullet.repeat_explosions:
+                                bullet.explode(self) # remove bullet
                         break  # No need to check further collisions for this bullet if it has already collided
-                
-        print("spawn "+str(self.heights[0]*(self.cell_size+1))+"tank checks "+str(c)+"\nbullet checks "+str(b)+"\ntotal checks "+str(c+b)+"\nnum of bullets "+str(len(self.bullet_group))+"\nnum of tiles "+str(len(self.ground_tiles)))
-
         
+        if "tab" in self.keys_pressed:
+            if self.current_weapon >= len(self.weapons)-1:
+                self.current_weapon = 0
+            else:
+                self.current_weapon += 1
+            
         
         if falling:
             self.tank.y -= gravity_force
@@ -348,8 +389,11 @@ class CannonGame(Widget):
         
         for bullet in self.bullet_group:
             bullet.trajectory()  # move all the bullets
-            if (bullet.y < 0 or bullet.x < 0 or bullet.x > Window.width) and bullet not in bullets_to_remove:
+            if (bullet.y < 0 or bullet.x < 0 or bullet.x > Window.width) and bullet not in bullets_to_remove and bullet.drill <= 0:
                 bullets_to_remove.append(bullet)
+            elif (bullet.y < 0 or bullet.x < 0 or bullet.x > Window.width) and bullet not in bullets_to_remove and bullet.drill > 0:
+                bullet.drill -= 1
+            
 
         for bullet in bullets_to_remove:
             if bullet in self.bullet_group:
@@ -437,6 +481,10 @@ class CannonGame(Widget):
 
     def on_mouse_move(self, window, pos):
         self.mouse = Vector(pos)  # Update mouse position vector
+        
+    def onMousePressed(self, instance, touch):
+        if touch.button == 'left':
+            self.tank.shoot(self)
         
 class CannonApp(App):
     def build(self):
