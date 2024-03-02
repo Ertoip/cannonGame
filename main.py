@@ -13,14 +13,83 @@ import random
 
 class Ground(Widget):
     reflective = BooleanProperty(False)
-    bulletproof = BooleanProperty(False)
+    perpetio = BooleanProperty(False)
+    elastic = BooleanProperty(False)
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         
         with self.canvas:
-            Color(0.6, 0.3, 0)        
+            Color(0.6, 0.3, 0)     
+
+class Obstacle(Widget):
+    gravity = BooleanProperty(False)
+    wormhole = BooleanProperty(False)
+    diameter = NumericProperty(2)
+    effectRadius = NumericProperty(10)
+    attraction = NumericProperty(0.2)
+    repulsive = BooleanProperty(False)
+    wormhole_exit = ListProperty([])
     
+    def __init__(self, cell_size, gravity = False, wormhole=False, wormhole_exit=[0,0], **kwargs):
+        super().__init__(**kwargs)
+        self.cell_size = cell_size
+        self.gravity = gravity
+        self.wormhole = wormhole
+        self.wormhole_exit = wormhole_exit
+        
+        with self.canvas:
+            # Draw the obstacle (circle)
+            Color(0, 0, 0)
+            self.obstacle = Ellipse(pos=self.pos, size=(self.diameter*self.cell_size, self.diameter*self.cell_size))
+
+            if self.gravity:
+                obstacle_center = (self.obstacle.pos[0] + self.obstacle.size[0] / 2,
+                self.obstacle.pos[1] + self.obstacle.size[1] / 2)
+
+                # Draw the effect radius ring
+                Color(0, 0, 0,)  # Red color with 50% opacity
+                self.effect_radius_ring = Line(circle=(obstacle_center[0], obstacle_center[1], self.effectRadius * self.cell_size), width=1.1)            
+            
+            if wormhole:
+                Color(1, 1, 1)
+                
+                self.wormhole = Ellipse(pos=self.wormhole_exit, size=(self.diameter*self.cell_size, self.diameter*self.cell_size))
+                        
+        self.bind(pos=self.update_obstacle_position)
+
+    def update_obstacle_position(self, *args):
+        # Update the position of the obstacle and effect radius ring when the widget's position changes
+        self.obstacle.pos = self.pos
+        self.effect_radius_ring.circle = (self.center_x, self.center_y, self.effectRadius)
+        
+    def apply_gravity(self, bullet):
+        # Calculate distance between bullet and obstacle
+        dist_x = self.center_x - bullet.center_x
+        dist_y = self.center_y - bullet.center_y
+        distance = max(1, math.sqrt(dist_x ** 2 + dist_y ** 2))  # Avoid division by zero
+        
+        # Calculate unit vector pointing towards the obstacle's center
+        unit_vector_x = dist_x / distance
+        unit_vector_y = dist_y / distance
+        
+        # Apply attraction force
+        if distance < self.effectRadius * self.cell_size:
+            force_direction = -1 if self.repulsive else 1
+            force = (self.attraction * self.cell_size)
+            # Update bullet position towards the center of the obstacle
+            bullet.x += force * unit_vector_x * bullet.mass * force_direction
+            bullet.y += force * unit_vector_y * bullet.mass * force_direction
+            
+    def wormholeCheck(self, bullet):
+        dist_x = self.center_x - bullet.center_x
+        dist_y = self.center_y - bullet.center_y
+        distance = math.sqrt(dist_x ** 2 + dist_y ** 2)  # Avoid division by zero
+        
+        if distance < self.diameter * self.cell_size:
+            bullet.x = self.wormhole_exit[0]
+            bullet.y = self.wormhole_exit[1]
+            
 
 #-------------------------------------------------------------------------tank-------------------------------------------------------------------------#
 
@@ -178,13 +247,13 @@ class CannonGame(Widget):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         
-        self.grid_size_x = 100  # Define the size of the grid
-        self.grid_size_y = self.grid_size_x/4 # Define the size of the grid
+        self.grid_size_x = 200  # Define the size of the grid
+        self.grid_size_y = 50 # Define the size of the grid
         
         # Define the parameters for scaling
         amplitude = 3  # Half of the peak-to-peak height (from -1 to 1)
         frequency = 5
-        offset = amplitude*3
+        offset = 30
         # Calculate the heights using a sine function
         self.heights = []
         for x in range(self.grid_size_x):
@@ -203,6 +272,7 @@ class CannonGame(Widget):
         self.ground_tiles = set()
         self.bullet_group = set()
         self.explosion_group = set()
+        self.obstacle_group = set()
         
         self.draw_background() # Draw the background
         self.terrain_gen()  # Draw the grid
@@ -225,9 +295,9 @@ class CannonGame(Widget):
         #------------------------------------------------------------------------- Weapons -------------------------------------------------------------------------#
         self.weapons = [{
             "name": "Bullet",
-            "mass": 0.2,
+            "mass": 0.15,
             "effect_diameter": 10,
-            "speed": 1,
+            "speed": 1.4,
             "diameter": 1,
             "drill": 0,
             "speed_falloff": 0,
@@ -236,21 +306,21 @@ class CannonGame(Widget):
         },
         {
             "name": "Bombshell",
-            "mass": 1,
+            "mass": 0.3,
             "effect_diameter": 10,
-            "speed": 0.8,
+            "speed": 1,
             "diameter": 1,
             "drill": 10,
-            "speed_falloff": 0.05,
+            "speed_falloff": 0.06,
             "repeat_explosions": False,
             "laser": False,
         },
         {
             "name": "Laser",
-            "mass": 0,
-            "effect_diameter": 3,
-            "speed": 1,
-            "diameter": 0.1,
+            "mass": 0.0,
+            "effect_diameter": 4,
+            "speed": 0.5,
+            "diameter": 0.3,
             "drill": 1000,
             "speed_falloff": 0.0,
             "repeat_explosions": True,
@@ -277,7 +347,13 @@ class CannonGame(Widget):
         while x < len(self.heights):
             for y in range(self.heights[x]):
                 ground = Ground()
-                ground_color = Color(0.6, 0.3, 0) if y+3 < self.heights[x] else Color(0.2, 1, 0.2) # set color
+                if y > self.heights[x]-3:
+                    ground_color = Color(0.2, 1, 0.2) # set color
+                elif y < 1:
+                    ground_color = Color(0.3, 0.3, 0.3)  
+                    ground.perpetio = True
+                else:
+                    ground_color = Color(0.6, 0.3, 0)
                 ground.canvas.add(ground_color)
                 ground_pos_y = (y * self.cell_size) + y_offset
                 ground_rectangle = Rectangle(pos=((x * self.cell_size)+x_offset, ground_pos_y), size=(self.cell_size, self.cell_size))
@@ -287,25 +363,12 @@ class CannonGame(Widget):
                 ground.pos=((x * self.cell_size)+x_offset, ground_pos_y)
                 self.ground_tiles.add(ground)  # Add ground to the group
                 self.add_widget(ground)
-                
-            if x == len(self.heights)-13 or x == len(self.heights)-12:
-                for i in range(30):
-                    ground = Ground()
-                    
-                    ground_color = Color(0.4, 0.4, 0.7)
-                    ground.canvas.add(ground_color)
-                    ground_pos_y = (i * self.cell_size) + (y * self.cell_size) + self.cell_size*3
-                    ground_rectangle = Rectangle(pos=((x * self.cell_size)+x_offset, ground_pos_y), size=(self.cell_size, self.cell_size))
-                    ground.canvas.add(ground_rectangle)
-                    
-                    ground.size_hint = (None, None)
-                    ground.size = (self.cell_size, self.cell_size)
-                    ground.pos=ground_rectangle.pos
-                    ground.reflective = True
-                    self.ground_tiles.add(ground)  # Add ground to the group
-                    self.add_widget(ground)
 
             x += 1
+        
+        obstacle = Obstacle(cell_size=self.cell_size, gravity=True, wormhole=True, wormhole_exit=(((self.grid_size_x/2)-60)*self.cell_size, ((self.grid_size_y / 2)+17)*self.cell_size), pos=(((self.grid_size_x/2)-60)*self.cell_size, ((self.grid_size_y / 2)+10)*self.cell_size))  # Position the obstacle in the middle of the screen
+        self.obstacle_group.add(obstacle) # Add obstacle to the group
+        self.add_widget(obstacle)
         
     def create_tank(self):
         self.tank = Tank()
@@ -323,6 +386,8 @@ class CannonGame(Widget):
         self.canvas.clear()
         self.ground_tiles.clear()
         self.bullet_group.clear()
+        self.explosion_group.clear()
+        self.obstacle_group.clear()
         self.cell_size = self.width / self.grid_size_x
         self.draw_background()  # Redraw the background
         self.terrain_gen()  # Redraw the grid
@@ -388,12 +453,34 @@ class CannonGame(Widget):
                     left = True
                         
             for explosion in explosions_to_remove:
-                touching, rect2 = self.check_collision_circle(circle=explosion, rect=ground) 
-                if touching:
-                    ground_to_remove.append(ground)
-                    
+                if not ground.perpetio:
+                    touching, rect2 = self.check_collision_circle(circle=explosion, rect=ground) 
+                    if touching:
+                        ground_to_remove.append(ground)
+            
         #bullet collisions
         for bullet in self.bullet_group:
+            bullet.trajectory()  # move all the bullets
+
+            if bullet.laser:
+                prev_coordinates = [bullet.x+bullet.diameter/2, bullet.y+bullet.diameter/2]
+
+                # Calculate new coordinates after moving the bullet
+                new_coordinates = [bullet.x+bullet.diameter/2 , bullet.y+bullet.diameter/2]
+                
+                # Draw the laser ray
+                with self.canvas:
+                    Color(1,0,0)
+                    laser_ray = Line(points=prev_coordinates + new_coordinates, width=bullet.diameter)
+                    bullet.rays.append(laser_ray)
+                    if len(bullet.rays) > 3:#length of the ray
+                        self.canvas.remove(bullet.rays[0])
+                        bullet.rays.pop(0)
+
+                
+            if (bullet.y < 0 or bullet.x < 0 or bullet.x > Window.width or bullet.y > Window.height) and bullet not in bullets_to_remove:
+                bullets_to_remove.append(bullet)
+            
             bullet_range_x = (bullet.x - self.cell_size, bullet.x + self.cell_size)#we use theese to improve performance by checking collision of only neraby objects
             bullet_range_y = (bullet.y - self.cell_size, bullet.y + self.cell_size)
 
@@ -410,32 +497,56 @@ class CannonGame(Widget):
                         left_side = ((g[0], g[1]), (g[0], g[3]))
                         right_side = ((g[2], g[1]), (g[2], g[3]))
                         
-                        normal_vector = [0, 1]
+                        nearest = self.nearest_side([top_side[0], bottom_side[1]], (prev_x, prev_y))
                         
-                        if self.intersect((prev_x, prev_y), (bullet.x, bullet.y), *top_side):
+                        if nearest == "top":
                             # Collision with the top side
-                            normal_vector = [0, 1]  # Normal vector pointing upwards
-                            bullet.pos = (ground.x+ground.width/2, ground.y+ground.width+10)
-                            print("top side collision")                            
+                            normal_vector = [1, 0]  # Normal vector pointing upwards
                         
-                        elif self.intersect((prev_x, prev_y), (bullet.x, bullet.y), *bottom_side):
+                        elif nearest == "bottom":
                             # Collision with the bottom side
-                            normal_vector = [0, -1]  # Normal vector pointing downwards
-                            bullet.pos = (ground.x+ground.width/2, ground.y-10)                            
-                            print("bottom side collision")                            
+                            normal_vector = [1, 0]  # Normal vector pointing downwards
                             
-                        elif self.intersect((prev_x, prev_y), (bullet.x, bullet.y), *right_side):
+                        elif nearest == "right":
                             # Collision with the right side
-                            normal_vector = [1, 0]  # Normal vector pointing to the right
-                            bullet.pos = (ground.x+ground.width+10, ground.y+ground.width/2)
-                            print("right side collision")                            
+                            normal_vector = [0, 1]  # Normal vector pointing to the right
                             
-                        elif self.intersect((prev_x, prev_y), (bullet.x, bullet.y), *left_side):
+                        elif nearest == "left":
                             # Collision with the left side
-                            normal_vector = [-1, 0]  # Normal vector pointing to the left   
-                            bullet.pos = (ground.x-10, ground.y+ground.width/2)
-                            print("left side collision")                            
+                            normal_vector = [0, 1]  # Normal vector pointing to the left   
+                        
+                        bullet.pos = (prev_x, prev_y)
+                        bullet.recalculate_angle(normal_vector)
+                        
+                    elif touching and not bullet.laser and ground.elastic:
+                        prev_x = bullet.x - bullet.speed * math.cos(bullet.angle)
+                        prev_y = bullet.y - (bullet.speed * math.sin(bullet.angle) - bullet.mass * (bullet.flighttime-0.1))
+                        
+                        top_side = ((g[0], g[3]), (g[2], g[3]))
+                        bottom_side = ((g[0], g[1]), (g[2], g[1]))
+                        left_side = ((g[0], g[1]), (g[0], g[3]))
+                        right_side = ((g[2], g[1]), (g[2], g[3]))
+                        
+                        nearest = self.nearest_side([top_side[0], bottom_side[1]], (prev_x, prev_y))
+                        
+                        if nearest == "top":
+                            # Collision with the top side
+                            normal_vector = [1, 0]  # Normal vector pointing upwards
+                        
+                        elif nearest == "bottom":
+                            # Collision with the bottom side
+                            normal_vector = [1, 0]  # Normal vector pointing downwards
                             
+                        elif nearest == "right":
+                            # Collision with the right side
+                            normal_vector = [0, 1]  # Normal vector pointing to the right
+                            
+                        elif nearest == "left":
+                            # Collision with the left side
+                            normal_vector = [0, 1]  # Normal vector pointing to the left   
+                        
+                        bullet.pos = (prev_x, prev_y)
+                        bullet.flighttime = bullet.flighttime/1.5
                         bullet.recalculate_angle(normal_vector)
                         
                     elif touching and bullet.drill <= 0:
@@ -448,14 +559,19 @@ class CannonGame(Widget):
                             bullet.speed -= bullet.speed_falloff
                             if bullet.repeat_explosions:
                                 bullet.explode(self) # remove bullet
-                        break  # No need to check further collisions for this bullet if it has already collided                        
+                        break  # No need to check further collisions for this bullet if it has already collided  
+                
+            for obstacle in self.obstacle_group:
+                if obstacle.gravity and not bullet.laser:
+                    obstacle.apply_gravity(bullet)
+                if obstacle.wormhole:
+                    obstacle.wormholeCheck(bullet)
         
         if "tab" in self.keys_up:
             if self.current_weapon >= len(self.weapons)-1:
                 self.current_weapon = 0
             else:
                 self.current_weapon += 1
-            print(self.weapons[self.current_weapon]["name"])
             
         
         if falling:
@@ -473,28 +589,6 @@ class CannonGame(Widget):
             self.tank.x -= movement_distance
 
         self.tank.set_cannon_angle(self.mouse)#move the cannon
-        
-
-        for bullet in self.bullet_group:
-            prev_coordinates = [bullet.x+bullet.diameter/2, bullet.y+bullet.diameter/2]
-            bullet.trajectory()  # move all the bullets
-
-            if bullet.laser:
-                # Calculate new coordinates after moving the bullet
-                new_coordinates = [bullet.x+bullet.diameter/2 , bullet.y+bullet.diameter/2]
-                
-                # Draw a line from previous coordinates to new coordinates
-                with self.canvas:
-                    Color(1,0,0)
-                    laser_ray = Line(points=prev_coordinates + new_coordinates, width=bullet.diameter)
-                    bullet.rays.append(laser_ray)
-                    if len(bullet.rays) > 3:
-                        self.canvas.remove(bullet.rays[0])
-                        bullet.rays.pop(0)
-
-                
-            if (bullet.y < 0 or bullet.x < 0 or bullet.x > Window.width) and bullet not in bullets_to_remove:
-                bullets_to_remove.append(bullet)
             
 
         for bullet in bullets_to_remove:
@@ -589,13 +683,55 @@ class CannonGame(Widget):
                     return True
         return False
     
-    def ccw(self, A, B, C):
-        """Check if three points are in counter-clockwise order."""
-        return (C[1]-A[1]) * (B[0]-A[0]) > (B[1]-A[1]) * (C[0]-A[0])
+    def point_to_line_distance(self, line, point):
+        """
+        Calculate the perpendicular distance from a point to a line segment.
+        """
+        x1, y1 = line[0]
+        x2, y2 = line[1]
+        x0, y0 = point
 
-    def intersect(self, A, B, C, D):
-        """Check if two line segments AB and CD intersect."""
-        return self.ccw(A, C, D) != self.ccw(B, C, D) and self.ccw(A, B, C) != self.ccw(A, B, D)
+        # Squared length of the line segment (avoiding square root)
+        length_squared = (x2 - x1) ** 2 + (y2 - y1) ** 2
+
+        # Avoid division by zero
+        if length_squared == 0:
+            # Use squared distance if line length is zero
+            return (x0 - x1) ** 2 + (y0 - y1) ** 2
+
+        # Projection of point onto the line
+        t = ((x0 - x1) * (x2 - x1) + (y0 - y1) * (y2 - y1)) / length_squared
+
+        # Clamp t to be within the segment
+        t = max(0, min(1, t))
+
+        # Coordinates of the closest point on the line segment
+        closest_x = x1 + t * (x2 - x1)
+        closest_y = y1 + t * (y2 - y1)
+
+        # Calculate squared distance from point to the closest point on the line
+        distance_squared = ((x0 - closest_x) ** 2 + (y0 - closest_y) ** 2)
+        return distance_squared
+
+    def nearest_side(self, square, point):
+        """
+        Determine the nearest side of a square to a given point.
+        """
+        sides = {
+            'top': ((square[0][0], square[1][1]), (square[1][0], square[1][1])),
+            'bottom': ((square[0][0], square[0][1]), (square[1][0], square[0][1])),
+            'left': ((square[0][0], square[0][1]), (square[0][0], square[1][1])),
+            'right': ((square[1][0], square[0][1]), (square[1][0], square[1][1]))
+        }
+
+        # Calculate distances from the point to each side
+        distances = {side: self.point_to_line_distance(sides[side], point) for side in sides}
+
+        # Find the side with the minimum distance
+        nearest = min(distances, key=distances.get)
+
+        return nearest
+    
 #-------------------------------------------------------------------------keyboard control functions-------------------------------------------------------------------------#    
     def keyboard_closed(self):
         self.keyboard.unbind(on_key_down=self.on_key_down)
