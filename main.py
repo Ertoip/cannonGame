@@ -5,11 +5,12 @@ from kivy.vector import Vector
 from kivy.clock import Clock
 from kivy.graphics import Rectangle, Color, PushMatrix, PopMatrix, Rotate, InstructionGroup, Line, Ellipse
 from kivy.uix.button import Button
-from kivy.core.window import Window
-from kivy.core.window import Keyboard
+from kivy.core.window import Window, Keyboard
+from kivy.config import Config
 import math
 import random
-
+import time
+import threading
 
 class Ground(Widget):
     reflective = BooleanProperty(False)
@@ -27,7 +28,7 @@ class Obstacle(Widget):
     wormhole = BooleanProperty(False)
     radius = NumericProperty(1)
     effectRadius = NumericProperty(10)
-    attraction = NumericProperty(0.1)
+    attraction = NumericProperty(0.2)
     repulsive = BooleanProperty(False)
     wormhole_exit = ListProperty([])
     
@@ -89,21 +90,21 @@ class Obstacle(Widget):
         if distance < self.radius*2 * self.cell_size/2:
             bullet.x = self.wormhole_exit[0]+self.wormhole.size[0]/2
             bullet.y = self.wormhole_exit[1]+self.wormhole.size[0]/2
-            
-
-#-------------------------------------------------------------------------tank-------------------------------------------------------------------------#
-
-class Tank(Widget):
+#-------------------------------------------------------------------------enemy target-------------------------------------------------------------------------#
+class Enemy(Widget):
     cannon_angle = NumericProperty(0)
     speed = NumericProperty(20)
-    mass = NumericProperty(30)
-
+    mass = NumericProperty(0.5)
+    
+    bullet_preds = ListProperty([])
+    num_preds = 3
+    dot_size = 1
+    
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        
         with self.canvas:
             # Draw the tank body (rectangle)
-            Color(0.9, 0.9, 0.9)
+            Color(0.1, 0.1, 0.1)
             self.rect = Rectangle(pos=self.pos, size=self.size)
             
             # Draw the cannon
@@ -117,7 +118,6 @@ class Tank(Widget):
     def update_rect(self, *args):
         self.rect.pos = self.pos
         self.rect.size = self.size
-        
         # Update the cannon length and width
         self.cannon_length = self.size[1] * 1.5  # Adjust the length of the cannon as needed
         self.cannon_width = self.size[0] * 1.5  # Adjust the width of the cannon as needed
@@ -144,7 +144,7 @@ class Tank(Widget):
         bullet = Bullet(radius=weapon.get("radius", None)*game.cell_size)
         
         bullet.angle = self.cannon_angle
-        bullet.pos = [self.center_x + self.cannon_length * math.cos(self.cannon_angle), self.center_y + self.cannon_length * math.sin(self.cannon_angle)]
+        bullet.pos = [self.center_x + self.cannon_length * math.cos(self.cannon_angle)-bullet.radius, self.center_y + self.cannon_length * math.sin(self.cannon_angle)-bullet.radius]
         bullet.color = (0.5, 0.5, 0.5, 1)
         
         bullet.effect_diameter = weapon.get("effect_diameter", None)
@@ -165,8 +165,124 @@ class Tank(Widget):
         self.x -= self.speed*cell_size*dt
     
     def fall(self, cell_size, dt):
-        self.y -= self.mass*cell_size*dt
+        self.y -= self.mass*cell_size
+        
+
+#-------------------------------------------------------------------------tank-------------------------------------------------------------------------#
+
+class Tank(Widget):
+    cannon_angle = NumericProperty(0)
+    speed = NumericProperty(20)
+    mass = NumericProperty(0.5)
     
+    bullet_preds = ListProperty([])
+    num_preds = 3
+    dot_size = 1
+    dot_step_size = 5
+    
+    def __init__(self, health = 3,**kwargs):
+        super().__init__(**kwargs)
+        with self.canvas:
+            # Draw the tank body (rectangle)
+            Color(0.9, 0.9, 0.9)
+            self.rect = Rectangle(pos=self.pos, size=self.size)
+            self.health = health
+            
+            # Draw the cannon
+            self.cannon_length = self.size[1] * 0.3  # Adjust the length of the cannon as needed
+            self.cannon_width = self.size[0] * 0.03  # Adjust the width of the cannon as needed
+            self.cannon = Line(points=(self.center_x, self.center_y, 
+                                        self.center_x + self.cannon_length, self.center_y + self.cannon_width), width=self.cannon_width)
+
+        self.bind(pos=self.update_rect, size=self.update_rect)
+
+    def update_rect(self, *args):
+        self.rect.pos = self.pos
+        self.rect.size = self.size
+        # Update the cannon length and width
+        self.cannon_length = self.size[1] * 1.5  # Adjust the length of the cannon as needed
+        self.cannon_width = self.size[0] * 1.5  # Adjust the width of the cannon as needed
+        
+        # Update the cannon points
+        self.cannon.points = (self.center_x, self.center_y, 
+                            self.center_x + self.cannon_length * math.cos(self.cannon_angle),
+                            self.center_y + self.cannon_length * math.sin(self.cannon_angle))
+        
+    def set_cannon_angle(self, mouse_pos):
+        """Set the angle of the cannon based on the mouse position."""
+        dx = mouse_pos[0] - self.center_x
+        dy = mouse_pos[1] - self.center_y
+        self.cannon_angle = math.atan2(dy, dx)  
+        
+        
+        self.cannon.points = (self.center_x, self.center_y, 
+                            self.center_x + self.cannon_length * math.cos(self.cannon_angle),
+                            self.center_y + self.cannon_length * math.sin(self.cannon_angle))
+        
+    def shoot(self, game):
+        weapon = game.weapons[game.current_weapon]
+
+        bullet = Bullet(radius=weapon.get("radius", None)*game.cell_size)
+        
+        bullet.angle = self.cannon_angle
+        bullet.pos = [self.center_x + self.cannon_length * math.cos(self.cannon_angle)-bullet.radius, self.center_y + self.cannon_length * math.sin(self.cannon_angle)-bullet.radius]
+        bullet.color = (0.5, 0.5, 0.5, 1)
+        
+        bullet.effect_diameter = weapon.get("effect_diameter", None)
+        bullet.mass = weapon.get("mass", None)*game.cell_size
+        bullet.speed = weapon.get("speed", None)*game.cell_size
+        bullet.drill = weapon.get("drill", None)
+        bullet.speed_falloff = weapon.get("speed_falloff", None)*game.cell_size
+        bullet.repeat_explosions = weapon.get("repeat_explosions", None)
+        bullet.laser = weapon.get("laser", None)
+        
+        game.bullet_group.add(bullet)
+        game.add_widget(bullet)
+    
+    def move_right(self, cell_size, dt):
+        self.x += self.speed*cell_size*dt
+    
+    def move_left(self, cell_size, dt):
+        self.x -= self.speed*cell_size*dt
+    
+    def fall(self, cell_size, dt):
+        self.y -= self.mass*cell_size
+        
+    def draw_preds(self, game, dt):
+        if len(self.bullet_preds) > 1:
+            for pred in self.bullet_preds:
+                self.canvas.remove(pred)
+            self.bullet_preds.clear()
+        dt = 0.012
+        for i in range(self.num_preds):
+            i = i+1
+            weapon = game.weapons[game.current_weapon]
+            mass = weapon.get("mass", None)*game.cell_size
+            speed = weapon.get("speed", None)*game.cell_size
+            radius=weapon.get("radius", None)*game.cell_size
+            cannon_pos = [self.center_x + self.cannon_length * math.cos(self.cannon_angle)-self.dot_size/2, self.center_y + self.cannon_length * math.sin(self.cannon_angle)-self.dot_size/2]
+            
+            with self.canvas:
+                #self.x += self.speed * math.cos(self.angle)*dt
+                #self.y += self.speed*dt * math.sin(self.angle) - self.mass*dt * self.flighttime
+                #10 +9 = 19 +8 = 27 +7 = 34 +6 = 40 45 49 52 54 55 54
+                
+                Color(1,1,1, 1/i)
+                dot_x = speed * math.cos(self.cannon_angle) * dt * i * self.dot_step_size + cannon_pos[0]
+                dot_y = cannon_pos[1]
+                
+                for j in range(i*self.dot_step_size):
+                    dot_y += speed * dt * math.sin(self.cannon_angle) - mass * dt *j*0.1
+                
+                dot = Ellipse(pos=(dot_x-radius, dot_y-radius), size=(self.dot_size*game.cell_size, self.dot_size*game.cell_size))
+                self.bullet_preds.append(dot)
+    
+    def hit(self, damage = 1):
+        self.health -= damage
+        print(self.health)
+        if self.health < 1:
+            App.get_running_app().stop() 
+            
 #------------------------------------------------------------------------- bullets -------------------------------------------------------------------------#
 
 class Bullet(Widget):
@@ -187,7 +303,7 @@ class Bullet(Widget):
         super().__init__(**kwargs)
         
         self.radius = radius
-        
+        self.lock = threading.Lock()
         with self.canvas:
             # Draw the bullet (circle)
             Color(0.4, 0.4, 0.4)
@@ -200,11 +316,14 @@ class Bullet(Widget):
         self.bullet.pos = self.pos
         
     def trajectory(self, dt):
-        self.prev_coordinates = [self.x,self.y]
-        self.x += self.speed * math.cos(self.angle)*dt
-        self.y += self.speed*dt * math.sin(self.angle) - self.mass*dt * self.flighttime
-        self.flighttime += 0.1
+        with self.lock:
+        # Convert speed to units per second
             
+            self.prev_coordinates = [self.x,self.y]
+            self.x += self.speed * math.cos(self.angle)*dt
+            self.y += self.speed*dt * math.sin(self.angle) - self.mass*dt * self.flighttime
+            self.flighttime += 0.1
+                
     def explode(self, game):
         explosion = Explosion(effect_diameter=self.effect_diameter * game.cell_size, pos=self.pos)
         game.add_widget(explosion)
@@ -252,54 +371,54 @@ class Explosion(Widget):
 #-------------------------------------------------------------------------class game-------------------------------------------------------------------------#
 class CannonGame(Widget):
     tank = ObjectProperty(None)
-    fps = NumericProperty(60)
+    fps = NumericProperty(120)
     keys_up = ListProperty([])
     
     chunk_size = NumericProperty(3)
-    chunk_number = NumericProperty(30)
+    chunk_number = NumericProperty(55)
     chunks = ListProperty([])
 
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        
+        super().__init__(**kwargs)        
         self.grid_size_x = self.chunk_number*self.chunk_size-1  # Define the size of the grid
         self.grid_size_y = 50 # Define the size of the grid
         self.cell_size = self.width / self.grid_size_x
+        self.prev_cell_size = self.cell_size
 
         for i in range(self.chunk_number):
             
             self.chunks.append({"ground":[], "explosions":[], "bullets":[], "obstacles":[], "x_limit":(((i+1)*self.chunk_size-self.chunk_size)*self.cell_size, ((i+1)*self.chunk_size)*self.cell_size)})
+        
         # Define the parameters for scaling
-        amplitude = 10  # Half of the peak-to-peak height (from -1 to 1)
-        frequency = 5
-        offset = 50
+        amplitude = 5  # Half of the peak-to-peak height (from -1 to 1)
+        frequency = 2
+        offset_y = 20
+        offset_x = 10
         # Calculate the heights using a sine function
         self.heights = []
         for x in range(self.grid_size_x):
             # Scale the sine function to fit within [0, 10]
-            y = math.sin((x * (2 * math.pi / self.grid_size_x))*frequency) * amplitude + offset
-
+            y = math.sin(((x+offset_x) * (2 * math.pi / self.grid_size_x))*frequency) * amplitude + offset_y
 
             self.heights.append(round(y))  # Round the result to the nearest integer
         
-
-        
-        self.initial_window_width = self.width
-        self.initial_window_height = self.height #helpful for keeping the original speed
-
         self.ground_tiles = set()
         self.bullet_group = set()
         self.explosion_group = set()
         self.obstacle_group = set()
+        self.enemy_group = set()
         
         self.draw_background() # Draw the background
         self.terrain_gen()  # Draw the grid
         self.create_tank()  # Create the tank
+        self.spawn_enemy()
         
-        Window.minimum_width = 800
-        Window.minimum_height = 600
-        Window.maximum_width = 800
-        Window.maximum_height = 600
+        Window.fullscreen = 'auto'
+        #Config.set('graphics', 'width', '400')
+        #Config.set('graphics', 'height', '300')
+        
+        # Prevent resizing
+        #Config.set('graphics', 'resizable', '0')
 
         self.keyboard = Window.request_keyboard(self.keyboard_closed, self)
         self.keyboard.bind(on_key_down=self.on_key_down)
@@ -315,8 +434,8 @@ class CannonGame(Widget):
         self.weapons = [{
             "name": "Bullet",
             "mass": 10,
-            "effect_diameter": 10,
-            "speed": 50,
+            "effect_diameter": 15,
+            "speed": 70,
             "radius": 0.5,
             "drill": 0,
             "speed_falloff": 0,
@@ -327,10 +446,10 @@ class CannonGame(Widget):
             "name": "Bombshell",
             "mass": 5,
             "effect_diameter": 10,
-            "speed": 30,
-            "radius": 1,
+            "speed": 100,
+            "radius": 0.3,
             "drill": 40,
-            "speed_falloff": 0.06,
+            "speed_falloff": 1,
             "repeat_explosions": False,
             "laser": False,
         },
@@ -338,8 +457,8 @@ class CannonGame(Widget):
             "name": "Laser",
             "mass": 0.0,
             "effect_diameter": 1,
-            "speed": 30,
-            "radius": 1,
+            "speed": 50,
+            "radius": 0.5,
             "drill": 1000,
             "speed_falloff": 0.0,
             "repeat_explosions": False,
@@ -373,9 +492,12 @@ class CannonGame(Widget):
 
             for y in range(self.heights[x]):
                 ground = Ground()
-                if y > self.heights[x]-3:
-                    ground_color = Color(0.2, 1, 0.2) # set color
-                    ground.elastic = True # set elastic
+                if y == self.heights[x]-1:
+                    ground_color = Color(0.1, 1, 0.1) # set color
+                elif y == self.heights[x]-2:
+                    ground_color = Color(0.1, 0.9, 0.1) # set color
+                elif y == self.heights[x]-3:
+                    ground_color = Color(0, 0.8, 0) # set color
                     
                 elif y < 1:
                     ground_color = Color(0.3, 0.3, 0.3)  
@@ -398,29 +520,66 @@ class CannonGame(Widget):
             x += 1
 
         
-        obstacle = Obstacle(cell_size=self.cell_size, gravity=True, wormhole=True, wormhole_exit=(((self.grid_size_x/2)-10)*self.cell_size, ((self.grid_size_y / 2)+10)*self.cell_size), pos=(((self.grid_size_x/2)+10)*self.cell_size, ((self.grid_size_y / 2)+10)*self.cell_size))  # Position the obstacle in the middle of the screen
-        self.obstacle_group.add(obstacle) # Add obstacle to the group
-        self.add_widget(obstacle)
+        #obstacle = Obstacle(cell_size=self.cell_size, gravity=True, wormhole=True, wormhole_exit=(((self.grid_size_x/2)-10)*self.cell_size, ((self.grid_size_y / 2)+10)*self.cell_size), pos=(((self.grid_size_x/2)+10)*self.cell_size, ((self.grid_size_y / 2)+10)*self.cell_size))  # Position the obstacle in the middle of the screen
+        #self.obstacle_group.add(obstacle) # Add obstacle to the group
+        #self.add_widget(obstacle)
         
-    def create_tank(self):
+        
+    def create_tank(self, new_pos = None):
+
         self.tank = Tank()
-        self.tank.color = (0, 1, 0, 1)  # Green color
         self.tank.size_hint = (None, None)
-        self.tank.pos = (1, self.heights[0]*(self.cell_size+2)+(self.height - self.grid_size_y * self.cell_size) / 2)  # Center tank horizontally
+        
+        if new_pos == None:
+            self.tank.pos = (self.cell_size, self.heights[0]*(self.cell_size)+2)
+        else:
+            self.tank.pos = (new_pos[0], new_pos[1])  # Center tank horizontally
+
+            
         self.tank.size = (self.cell_size*2, self.cell_size*2)
         
         self.add_widget(self.tank)  # Add tank widget to the game
+    
+    def spawn_enemy(self, new_pos = None):
         
+        enemy = Enemy()
+        enemy.size_hint = (None, None)
+        enemy.size = (self.cell_size*2, self.cell_size*2)
+
+        if new_pos == None:
+            enemy.pos = (self.width-self.cell_size-enemy.size[0], self.heights[0]*self.cell_size+2)
+        else:
+            enemy.pos = (new_pos[0], new_pos[1])  # Center tank horizontally
+
+            
         
+        self.enemy_group.add(Enemy)
+        
+                
+        self.add_widget(enemy)  # Add tank widget to the game
+
 #-------------------------------------------------------------------------system functions-------------------------------------------------------------------------#
     def on_size(self, *args):
+        
+        prev_cell_size = self.prev_cell_size
+        self.cell_size = self.width / self.grid_size_x
+        self.prev_cell_size = self.cell_size
+
+        tank_x = self.tank.x
+        tank_y = self.tank.y
+        
+        new_x = (tank_x/prev_cell_size)*self.cell_size
+        new_y = (tank_y/prev_cell_size)*self.cell_size
+        
+                        
         # Redraw grid and background when the size of the widget changes
+        self.remove_widget(self.tank)
         self.canvas.clear()
         self.ground_tiles.clear()
         self.bullet_group.clear()
         self.explosion_group.clear()
         self.obstacle_group.clear()
-        self.cell_size = self.width / self.grid_size_x
+        
         
         self.chunks.clear()
         for i in range(self.chunk_number):    
@@ -428,8 +587,15 @@ class CannonGame(Widget):
 
         self.draw_background()  # Redraw the background
         self.terrain_gen()  # Redraw the grid
-        self.create_tank()  # Create the tank
+        self.create_tank(new_pos=(new_x,new_y))  # Create the tank
+        for enemy in self.enemy_group:
+            enemy_x = self.tank.x
+            enemy_y = self.tank.y
+            
+            new_x = (enemy_x/prev_cell_size)*self.cell_size
+            new_y = (enemy_y/prev_cell_size)*self.cell_size
 
+            self.spawn_enemy()
 
     def update(self, dt):
         
@@ -440,6 +606,10 @@ class CannonGame(Widget):
         ground_to_render = []
         
         processed_chunks = set()
+
+        bullets_to_remove = []
+        explosions_to_remove = []
+        ground_to_remove = []
 
         for i in range(self.chunk_number):
             if self.chunks[i]["x_limit"][0] <= self.tank.x <= self.chunks[i]["x_limit"][1] or self.chunks[i]["x_limit"][0] <= self.tank.x + self.tank.width <= self.chunks[i]["x_limit"][1]:
@@ -472,6 +642,7 @@ class CannonGame(Widget):
                         processed_chunks.add(i + 1)
                         
             for explosion in self.explosion_group:
+
                 if (self.chunks[i]["x_limit"][0] <= explosion.x-explosion.radius <= self.chunks[i]["x_limit"][1] 
                     or self.chunks[i]["x_limit"][0] <= explosion.x + explosion.radius <= self.chunks[i]["x_limit"][1]
                     or explosion.x - explosion.radius <= self.chunks[i]["x_limit"][0] <= explosion.x + explosion.radius and explosion.x - explosion.radius <= self.chunks[i]["x_limit"][1] <= explosion.x + explosion.radius):
@@ -487,26 +658,27 @@ class CannonGame(Widget):
                     if i + 1 < self.chunk_number and (i + 1) not in processed_chunks:
                         ground_to_render.extend(self.chunks[i + 1]["ground"])
                         processed_chunks.add(i + 1)
-
+                        
+        self.tank.draw_preds(self, dt)
+                        
                             
-        bullets_to_remove = []
-        explosions_to_remove = []
-        ground_to_remove = []
-
         falling = True #wheater the tank can fall or move
         right = False
         left = False
-        
-        for explosion in self.explosion_group:
-            if explosion.radius*2 < explosion.effect_diameter:
-                explosion.increase_explosion_radius()
-            else:
-                explosions_to_remove.append(explosion)
-            
+                    
         range_x = (self.tank.x - self.cell_size * 2, self.tank.x + self.cell_size * 2)#we use theese to improve performance by checking collision of only neraby objects
         range_y = (self.tank.y - self.cell_size * 2, self.tank.y + self.cell_size * 2)
         
-        
+        for explosion in self.explosion_group:
+            if explosion.radius*2 < explosion.effect_diameter:
+                    explosion.increase_explosion_radius()
+            else:
+                explosions_to_remove.append(explosion)
+                touching, rect2 = self.check_collision_circle(circle=explosion, rect=self.tank) 
+                if touching:
+                    self.tank.hit()
+            
+            
         collision_not_detected = True
         #tank collisions
         for ground in ground_to_render:
@@ -521,7 +693,7 @@ class CannonGame(Widget):
             if range_x[0] <= ground.x <= range_x[1] and range_y[0] <= ground.y <= range_y[1]: 
 
                 if falling:    
-                    touching, rect2 = self.check_collision(rect1=self.tank, rect2=ground, gravity=tank_falling_distance)
+                    touching, rect2 = self.check_collision(rect1=self.tank, rect2=ground, gravity=3)
                     if touching:
                         falling = False
                         if self.tank.y > rect2[3]:
@@ -574,10 +746,16 @@ class CannonGame(Widget):
             self.tank.move_left(cell_size=self.cell_size, dt=dt)
 
         self.tank.set_cannon_angle(self.mouse)#move the cannon
-            
-        #bullet collisions
+
         for bullet in self.bullet_group:
             bullet.trajectory(dt)  # move all the bullets
+            
+            touching, rect2 = self.check_collision_circle(circle=bullet, rect=self.tank) 
+            if touching:
+                if bullet.laser:
+                    self.tank.hit()
+                bullets_to_remove.append(bullet)
+
 
             if bullet.laser:
 
@@ -670,7 +848,7 @@ class CannonGame(Widget):
                         bullets_to_remove.append(bullet)
                         break  # No need to check further collisions for this bullet if it has already collided  
                         
-                    elif touching and bullet.drill > 0:
+                    elif touching and bullet.drill > 0 and not ground.bulletproof:
                         bullet.drill -= 1
                         if bullet.speed > 0:
                             bullet.speed -= bullet.speed_falloff
@@ -681,14 +859,14 @@ class CannonGame(Widget):
                         if bullet.laser:
                             ground_to_remove.append(ground)
                         break  # No need to check further collisions for this bullet if it has already collided  
-                
-            for obstacle in self.obstacle_group:
-                if obstacle.gravity and not bullet.laser:
-                    obstacle.apply_gravity(bullet=bullet, dt=dt)
-                if obstacle.wormhole:
-                    obstacle.wormholeCheck(bullet)
-        
-        
+            
+        for obstacle in self.obstacle_group:
+            if obstacle.gravity and not bullet.laser:
+                obstacle.apply_gravity(bullet=bullet, dt=dt)
+            if obstacle.wormhole:
+                obstacle.wormholeCheck(bullet)
+
+            
         if "tab" in self.keys_up:
             if self.current_weapon >= len(self.weapons) -1:
                 self.current_weapon = 0
@@ -702,8 +880,8 @@ class CannonGame(Widget):
                 if bullet.laser:
                     for r in bullet.rays:
                         self.canvas.remove(r)
-                                
-                bullet.explode(self) # remove bullet
+                else:                
+                    bullet.explode(self) # remove bullet
                 self.bullet_group.remove(bullet)
                 self.remove_widget(bullet)
         
@@ -721,6 +899,12 @@ class CannonGame(Widget):
                     chunk["ground"].remove(ground)
                 
         self.keys_up = []
+        
+#-------------------------------------------------------------------------time functions-------------------------------------------------------------------------#    
+    def check_seconds_passed(start_time, seconds):
+        current_time = time.time()
+        elapsed_time = current_time - start_time
+        return elapsed_time >= seconds
                 
 #-------------------------------------------------------------------------collision functions-------------------------------------------------------------------------#    
                 
