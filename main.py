@@ -104,11 +104,14 @@ class Enemy(Widget):
     
     #ai_settings
     direct_hitter = BooleanProperty(True)
-    imprecision = NumericProperty(0.01)
+    imprecision = NumericProperty(0.2)
     weapon_range = NumericProperty(50)
     moving = BooleanProperty(True)
     
-    def __init__(self, **kwargs):
+    reloading = BooleanProperty(False)
+    reload_bar_lenght = NumericProperty(0)
+
+    def __init__(self, ammo, max_ammo, reload_time, **kwargs):
         super().__init__(**kwargs)
         with self.canvas:
             # Draw the tank body (rectangle)
@@ -120,6 +123,17 @@ class Enemy(Widget):
             self.cannon_width = self.size[0] * 0.03  # Adjust the width of the cannon as needed
             self.cannon = Line(points=(self.center_x, self.center_y, 
                                         self.center_x + self.cannon_length, self.center_y + self.cannon_width), width=self.cannon_width)
+            
+            self.ammo = ammo
+            self.max_ammo = max_ammo
+            self.reload_time = reload_time
+
+            self.cannon_length = self.size[1] * 0.3  # Adjust the length of the cannon as needed
+            self.cannon_width = self.size[0] * 0.02  # Adjust the width of the cannon as needed
+            self.reload_bar_lenght = self.width * 1.6 * self.ammo/self.max_ammo
+            
+            Color(1,1,1,1)
+            self.reload_bar = Line(points=(self.x-self.width*0.1, self.top + self.height*0.3, self.right+self.width*0.1, self.top + self.height*0.3), width=self.height*0.05)
 
         self.bind(pos=self.update_rect, size=self.update_rect)
 
@@ -134,12 +148,23 @@ class Enemy(Widget):
         self.cannon.points = (self.center_x, self.center_y, 
                             self.center_x + self.cannon_length * math.cos(self.cannon_angle),
                             self.center_y + self.cannon_length * math.sin(self.cannon_angle))
+        
+        if not self.reloading:
+            self.reload_bar_lenght = self.width * 1.6 * self.ammo/self.max_ammo
+        
+        # Update the reload bar
+        reload_bar_height = self.height * 0.12  # Adjust the width of the reload bar as needed
+        self.reload_bar.points = (self.x + self.width +self.width * 0.3 - self.reload_bar_lenght, self.top + self.height * 0.3,
+                                 self.x + self.width * 1.3 , self.top + self.height * 0.3)
+        
+        self.reload_bar.width = reload_bar_height    
+
     def shoot(self, game):
         weapon = game.enemy_weapon
 
         firerate = weapon.get("firerate")
         
-        if time.time() - self.last_shot_time >= 1 / firerate:
+        if time.time() - self.last_shot_time >= 1 / firerate and not self.reloading:
             bullet = Bullet(radius=weapon.get("radius", None)*game.cell_size)
             
             bullet.angle = self.cannon_angle
@@ -160,6 +185,18 @@ class Enemy(Widget):
             game.add_widget(bullet)
             
             self.last_shot_time = time.time()
+            
+            self.ammo -= 1
+            
+            self.reload_bar_lenght = self.width * 1.6 * self.ammo/self.max_ammo
+            self.reload_bar.points = (self.x + self.width +self.width * 0.3 - self.reload_bar_lenght, self.top + self.height * 0.3,
+                                self.x + self.width * 1.3 , self.top + self.height * 0.3)
+
+            if self.ammo <= 0:
+                self.reload_weapon()
+            
+            self.last_timepoint = time.time()
+
 
     def enemy_ai(self, game, start_x, start_y, target_x, target_y, speed, g, dt):
         x = target_x - start_x
@@ -178,8 +215,6 @@ class Enemy(Widget):
 
                 if denominator == 0:
                     self.cannon_angle = math.pi / 2 if numerator > 0 else -math.pi / 2
-                    random_adjustment = random.uniform(-self.imprecision, self.imprecision)
-                    self.cannon_angle += random_adjustment
                 else:
                     self.cannon_angle = math.atan2(numerator, denominator)
                     random_adjustment = random.uniform(-self.imprecision, self.imprecision)
@@ -214,33 +249,67 @@ class Enemy(Widget):
         if self.health < 1:
             App.get_running_app().stop() 
             
+    def reload_weapon(self):
+        if not self.reloading:
+            self.reloading = True
+            self.last_timepoint = time.time()
+            self.ammo = 0  # Reset ammunition count when reloading
+
+    def check_reloading(self):
+        if self.reloading:
+            if time.time() - self.last_timepoint >= self.reload_time:
+                self.reloading = False
+                self.ammo = self.max_ammo  # Refill ammunition count after reloading  
+                self.reload_bar_lenght = self.width * 1.6 * self.ammo/self.max_ammo
+                self.reload_bar.points = (self.x + self.width +self.width * 0.3 - self.reload_bar_lenght, self.top + self.height * 0.3,
+                                self.x + self.width * 1.3 , self.top + self.height * 0.3)
+
+                
+            self.reload_bar_lenght = self.width * 1.6 * (time.time() - self.last_timepoint)/self.reload_time
+            self.reload_bar.points = (self.x + self.width +self.width * 0.3 - self.reload_bar_lenght, self.top + self.height * 0.3,
+                                 self.x + self.width * 1.3 , self.top + self.height * 0.3)
+
+            
 #-------------------------------------------------------------------------tank-------------------------------------------------------------------------#
 
 class Tank(Widget):
     cannon_angle = NumericProperty(0)
     speed = NumericProperty(20)
     mass = NumericProperty(0.5)
-    last_shot_time = NumericProperty(0)
+    last_timepoint = NumericProperty(0)
     
     bullet_preds = ListProperty([])
-    num_preds = 3
-    dot_size = 1
-    dot_step_size = 5
+    num_preds = NumericProperty(3)
+    dot_size = NumericProperty(1)
+    dot_step_size = NumericProperty(5)
     
-    def __init__(self, health = 50,**kwargs):
+    reloading = BooleanProperty(False)
+    reload_bar_lenght = NumericProperty(0)
+
+        
+    def __init__(self, health = 50, ammo=10, max_ammo = 10, reload_time = 10, **kwargs):
         super().__init__(**kwargs)
         with self.canvas:
             # Draw the tank body (rectangle)
             Color(0.9, 0.9, 0.9)
             self.tank_image_source = "Tank 1.png"
             self.rect = Rectangle(source=self.tank_image_source, pos=self.pos, size=self.size)
+            
             self.health = health
+            self.ammo = ammo
+            self.max_ammo = max_ammo
+            self.reload_time = reload_time
             
             # Draw the cannon
             self.cannon_length = self.size[1] * 0.3  # Adjust the length of the cannon as needed
             self.cannon_width = self.size[0] * 0.02  # Adjust the width of the cannon as needed
-            self.cannon = Line(points=(self.center_x, self.center_y, 
-                                    self.center_x + self.cannon_length, self.center_y + self.cannon_width), width=self.cannon_width)
+            self.reload_bar_lenght = self.width * 1.6 * self.ammo/self.max_ammo
+
+            self.cannon = Line(points=(self.x - self.width * 0.3, self.top + self.height * 0.3,
+                                 self.x - self.width * 0.3 + self.reload_bar_lenght, self.top + self.height * 0.3), width=self.cannon_width)
+            
+            Color(1,1,1,1)
+            self.reload_bar = Line(points=(self.x-self.width*0.1, self.top + self.height*0.3, self.right+self.width*0.1, self.top + self.height*0.3), width=self.height*0.05)
 
         self.bind(pos=self.update_rect, size=self.update_rect)
 
@@ -249,19 +318,31 @@ class Tank(Widget):
         self.rect.size = self.size
         # Update the cannon length and width
         self.cannon_length = self.size[1] * 1  # Adjust the length of the cannon as needed
-        self.cannon_width = self.size[0] * 1.5  # Adjust the width of the cannon as needed
+        self.cannon_width = self.size[0] * 0.06  # Adjust the width of the cannon as needed
         
         # Update the cannon points
         self.cannon.points = (self.center_x, self.center_y, 
                             self.center_x + self.cannon_length * math.cos(self.cannon_angle),
                             self.center_y + self.cannon_length * math.sin(self.cannon_angle))
+        self.cannon.width = self.cannon_width
+        
+        if not self.reloading:
+            self.reload_bar_lenght = self.width * 1.6 * self.ammo/self.max_ammo
+        
+        # Update the reload bar
+        reload_bar_height = self.height * 0.12  # Adjust the width of the reload bar as needed
+        self.reload_bar.points = (self.x - self.width * 0.3, self.top + self.height * 0.3,
+                                 self.x - self.width * 0.3 + self.reload_bar_lenght, self.top + self.height * 0.3)
+        
+        self.reload_bar.width = reload_bar_height    
+            
+
         
     def set_cannon_angle(self, mouse_pos):
         """Set the angle of the cannon based on the mouse position."""
         dx = mouse_pos[0] - self.center_x
         dy = mouse_pos[1] - self.center_y
         self.cannon_angle = math.atan2(dy, dx)  
-        
         
         self.cannon.points = (self.center_x, self.center_y, 
                             self.center_x + self.cannon_length * math.cos(self.cannon_angle),
@@ -272,11 +353,11 @@ class Tank(Widget):
 
         firerate = weapon.get("firerate")
         
-        if time.time() - self.last_shot_time >= 1 / firerate:
+        if time.time() - self.last_timepoint >= 1 / firerate and not self.reloading:
             bullet = Bullet(radius=weapon.get("radius", None)*game.cell_size)
             
             bullet.angle = self.cannon_angle
-            bullet.pos = [self.center_x + (self.cannon_length +5) * math.cos(self.cannon_angle)-bullet.radius, self.center_y + (self.cannon_length +5) * math.sin(self.cannon_angle)-bullet.radius]
+            bullet.pos = [self.center_x + (self.cannon_length *2) * math.cos(self.cannon_angle)-bullet.radius, self.center_y + (self.cannon_length *2) * math.sin(self.cannon_angle)-bullet.radius]
             bullet.color = (0.5, 0.5, 0.5, 1)
             
             bullet.init_x = bullet.x
@@ -292,7 +373,16 @@ class Tank(Widget):
             game.bullet_group.add(bullet)
             game.add_widget(bullet)
             
-            self.last_shot_time = time.time()
+            self.ammo -= 1
+            
+            self.reload_bar_lenght = self.width * 1.6 * self.ammo/self.max_ammo
+            self.reload_bar.points = (self.x - self.width * 0.3, self.top + self.height * 0.3,
+                                 self.x - self.width * 0.3 + self.reload_bar_lenght, self.top + self.height * 0.3)
+
+            if self.ammo <= 0:
+                self.reload_weapon()
+            
+            self.last_timepoint = time.time()
     
     def move_right(self, cell_size, dt):
         self.x += self.speed*cell_size*dt
@@ -332,6 +422,25 @@ class Tank(Widget):
         if self.health < 1:
             App.get_running_app().stop() 
             
+    def reload_weapon(self):
+        if not self.reloading:
+            self.reloading = True
+            self.last_timepoint = time.time()
+            self.ammo = 0  # Reset ammunition count when reloading
+
+    def check_reloading(self):
+        if self.reloading:
+            if time.time() - self.last_timepoint >= self.reload_time:
+                self.reloading = False
+                self.ammo = self.max_ammo  # Refill ammunition count after reloading  
+                self.reload_bar_lenght = self.width * 1.6 * self.ammo/self.max_ammo
+                self.reload_bar.points = (self.x - self.width * 0.3, self.top + self.height * 0.3, self.x - self.width * 0.3 + self.reload_bar_lenght, self.top + self.height * 0.3)
+                
+            self.reload_bar_lenght = self.width * 1.6 * (time.time() - self.last_timepoint)/self.reload_time
+            self.reload_bar.points = (self.x - self.width * 0.3, self.top + self.height * 0.3,
+                                self.x - self.width * 0.3 + self.reload_bar_lenght, self.top + self.height * 0.3)
+
+        
 #------------------------------------------------------------------------- bullets -------------------------------------------------------------------------#
 
 class Bullet(Widget):
@@ -423,7 +532,7 @@ class Explosion(Widget):
 class CannonGame(Widget):
     tank = ObjectProperty(None)
     enemy = ObjectProperty(None)
-    fps = NumericProperty(120)
+    fps = NumericProperty(0)
     keys_up = ListProperty([])
     fullscreen = BooleanProperty(True)
     
@@ -432,6 +541,67 @@ class CannonGame(Widget):
     chunks = ListProperty([])
 
     def __init__(self, **kwargs):
+#------------------------------------------------------------------------- Weapons -------------------------------------------------------------------------#
+
+        self.weapons = [{
+            "name": "Bullet",
+            "mass": 0.05,
+            "effect_diameter": 15,
+            "speed": 2,
+            "firerate": 2,
+            "reload_speed": 4,
+            "ammo_number": 5,
+            "radius": 0.5,
+            "drill": 0,
+            "repeat_explosions": False,
+            "laser": False,
+        },
+        {
+            "name": "Bombshell",
+            "mass": 0.05,
+            "effect_diameter": 10,
+            "speed": 2,
+            "firerate": 3,
+            "reload_speed": 6,
+            "ammo_number": 30,
+            "radius": 0.3,
+            "drill": 40,
+            "repeat_explosions": False,
+            "laser": False,
+        },
+        {
+            "name": "Laser",
+            "mass": 0.0,
+            "effect_diameter": 1,
+            "speed": 1,
+            "firerate": 3,
+            "reload_speed": 6,
+            "ammo_number": 30,
+            "radius": 0.5,
+            "drill": 100,
+            "repeat_explosions": False,
+            "laser": True,
+        }]
+        
+
+        self.current_weapon = 0
+        
+        self.enemy_weapon = {
+            "name": "sniper",
+            "mass": 0.01,
+            "effect_diameter": 2,
+            "speed": 2,
+            "firerate": 5,
+            "reload_speed": 6,
+            "ammo_number": 30,
+            "radius": 0.6,
+            "drill": 0,
+            "repeat_explosions": False,
+            "laser": False,
+        }
+
+#------------------------------------------------------------------------- Init Game -------------------------------------------------------------------------#
+
         super().__init__(**kwargs)        
         self.grid_size_x = self.chunk_number*self.chunk_size-1  # Define the size of the grid
         self.grid_size_y = 50 # Define the size of the grid
@@ -484,56 +654,6 @@ class CannonGame(Widget):
         self.mouse = Vector(Window.mouse_pos)  # Vector to store mouse position        
         self.bind(on_touch_down = self.onMousePressed)
 
-#------------------------------------------------------------------------- Weapons -------------------------------------------------------------------------#
-
-        self.weapons = [{
-            "name": "Bullet",
-            "mass": 0.05,
-            "effect_diameter": 15,
-            "speed": 2,
-            "firerate": 2,
-            "radius": 0.5,
-            "drill": 0,
-            "repeat_explosions": False,
-            "laser": False,
-        },
-        {
-            "name": "Bombshell",
-            "mass": 0.05,
-            "effect_diameter": 10,
-            "speed": 2,
-            "firerate": 3,
-            "radius": 0.3,
-            "drill": 40,
-            "repeat_explosions": False,
-            "laser": False,
-        },
-        {
-            "name": "Laser",
-            "mass": 0.0,
-            "effect_diameter": 1,
-            "speed": 1,
-            "firerate": 3,
-            "radius": 0.5,
-            "drill": 100,
-            "repeat_explosions": False,
-            "laser": True,
-        }]
-        
-
-        self.current_weapon = 0
-        
-        self.enemy_weapon = {
-            "name": "sniper",
-            "mass": 0.01,
-            "effect_diameter": 2,
-            "speed": 2,
-            "firerate": 20,
-            "radius": 0.3,
-            "drill": 0,
-            "repeat_explosions": False,
-            "laser": False,
-        }
 
 #-------------------------------------------------------------------------map generation-------------------------------------------------------------------------#
     def draw_background(self):
@@ -594,9 +714,11 @@ class CannonGame(Widget):
         
         
     def create_tank(self, new_pos = None):
+        weapon = self.weapons[self.current_weapon]
 
-        self.tank = Tank()
+        self.tank = Tank(health=10, ammo=weapon["ammo_number"], max_ammo=weapon["ammo_number"], reload_time=weapon["reload_speed"])
         self.tank.size_hint = (None, None)
+        
         
         if new_pos == None:
             self.tank.pos = (self.cell_size, self.heights[0]*(self.cell_size)+2)
@@ -610,7 +732,7 @@ class CannonGame(Widget):
     
     def spawn_enemy(self, new_pos = None):
         
-        self.enemy = Enemy()
+        self.enemy = Enemy(self.enemy_weapon["ammo_number"], self.enemy_weapon["ammo_number"], self.enemy_weapon["reload_speed"])
         self.enemy.size_hint = (None, None)
         self.enemy.size = (self.cell_size*2, self.cell_size*2)
 
@@ -1083,9 +1205,18 @@ class CannonGame(Widget):
             for chunk in self.chunks:
                 if ground in chunk["ground"]:
                     chunk["ground"].remove(ground)
-                
-        self.keys_up = []
+
+#-------------------------------------------------------------------------reload functions-------------------------------------------------------------------------#    
+    
+        self.tank.check_reloading()
         
+        self.enemy.check_reloading()
+        
+        if "r" in self.keys_pressed:
+            self.tank.reload_weapon()
+        
+        self.keys_up = []
+                
 #-------------------------------------------------------------------------time functions-------------------------------------------------------------------------#    
     def check_seconds_passed(start_time, seconds):
         current_time = time.time()
@@ -1209,7 +1340,8 @@ class CannonGame(Widget):
 class CannonApp(App):
     def build(self):
         game = CannonGame()
-        Clock.schedule_interval(game.update, 1 / game.fps)
+        fps = 1 / game.fps if game.fps != 0 else 0
+        Clock.schedule_interval(game.update, fps)
         return game
 
 
