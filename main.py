@@ -28,7 +28,7 @@ class Obstacle(Widget):
     wormhole = BooleanProperty(False)
     radius = NumericProperty(1)
     effectRadius = NumericProperty(10)
-    attraction = NumericProperty(0.2)
+    attraction = NumericProperty(3)
     repulsive = BooleanProperty(False)
     wormhole_exit = ListProperty([])
     
@@ -42,29 +42,29 @@ class Obstacle(Widget):
         with self.canvas:
             # Draw the obstacle (circle)
             Color(0, 0, 0)
-            self.obstacle = Ellipse(pos=self.pos, size=(self.radius*2*self.cell_size, self.radius*2*self.cell_size))
+            self.obstacle = Ellipse(pos=(self.center_x-self.radius*self.cell_size, self.center_y-self.radius*self.cell_size), size=(self.radius*2*self.cell_size, self.radius*2*self.cell_size))
 
             if self.gravity:
-                obstacle_center = (self.pos[0] + self.obstacle.size[0] / 2,
-                self.pos[1] + self.obstacle.size[1] / 2)
+                obstacle_center = (self.pos[0] + self.obstacle.size[0] / 2, self.pos[1] + self.obstacle.size[1] / 2)
 
                 # Draw the effect radius ring
                 Color(0, 0, 0,)  # Red color with 50% opacity
-                self.effect_radius_ring = Line(circle=(obstacle_center[0], obstacle_center[1], self.effectRadius * self.cell_size), width=1.1)            
+                self.effect_radius_ring = Line(circle=(self.center_x, self.center_y, self.effectRadius * self.cell_size), width=1.1)            
             
             if wormhole:
                 Color(1, 1, 1)
                 
                 self.wormhole = Ellipse(pos=self.wormhole_exit, size=(self.radius*2*self.cell_size, self.radius*2*self.cell_size))
                         
-        self.bind(pos=self.update_obstacle_position)
+        self.bind(pos=self.update_obstacle_position, size=self.update_obstacle_position)
 
     def update_obstacle_position(self, *args):
         # Update the position of the obstacle and effect radius ring when the widget's position changes
-        self.obstacle.pos = self.pos
+        self.obstacle.pos = (self.center_x, self.center_y)
+        self.obstacle.size = self.size
         self.effect_radius_ring.circle = (self.center_x, self.center_y, self.effectRadius)
         
-    def apply_gravity(self, bullet, dt):
+    def apply_gravity(self, bullet):
         # Calculate distance between bullet and obstacle
         dist_x = self.center_x - bullet.center_x
         dist_y = self.center_y - bullet.center_y
@@ -93,8 +93,8 @@ class Obstacle(Widget):
 #-------------------------------------------------------------------------enemy target-------------------------------------------------------------------------#
 class Enemy(Widget):
     cannon_angle = NumericProperty(math.pi)
-    speed = NumericProperty(20)
-    mass = NumericProperty(0.5)
+    speed = NumericProperty(0.2)
+    mass = NumericProperty(0.3)
     health = NumericProperty(5)
     last_shot_time = NumericProperty(0)
 
@@ -104,8 +104,8 @@ class Enemy(Widget):
     
     #ai_settings
     direct_hitter = BooleanProperty(True)
-    imprecision = NumericProperty(0.2)
-    weapon_range = NumericProperty(50)
+    imprecision = NumericProperty(0.001)
+    weapon_range = NumericProperty(300)
     moving = BooleanProperty(True)
     
     reloading = BooleanProperty(False)
@@ -170,10 +170,7 @@ class Enemy(Widget):
             bullet.angle = self.cannon_angle
             bullet.pos = [self.center_x + (self.cannon_length +5) * math.cos(self.cannon_angle)-bullet.radius, self.center_y + (self.cannon_length +5) * math.sin(self.cannon_angle)-bullet.radius]
             bullet.color = (0.5, 0.5, 0.5, 1)
-            
-            bullet.init_x = bullet.x
-            bullet.init_y = bullet.y
-            
+                        
             bullet.effect_diameter = weapon.get("effect_diameter", None)
             bullet.mass = weapon.get("mass", None)*game.cell_size
             bullet.speed = weapon.get("speed", None)*game.cell_size
@@ -198,7 +195,7 @@ class Enemy(Widget):
             self.last_timepoint = time.time()
 
 
-    def enemy_ai(self, game, start_x, start_y, target_x, target_y, speed, g, dt):
+    def enemy_ai(self, game, start_x, start_y, target_x, target_y, speed, g):
         x = target_x - start_x
         y = target_y - start_y
 
@@ -235,11 +232,11 @@ class Enemy(Widget):
         
         return 0,0
             
-    def move_right(self, cell_size, dt):
-        self.x += self.speed*cell_size*dt
+    def move_right(self, cell_size):
+        self.x += self.speed*cell_size
     
-    def move_left(self, cell_size, dt):
-        self.x -= self.speed*cell_size*dt
+    def move_left(self, cell_size):
+        self.x -= self.speed*cell_size
     
     def fall(self, cell_size):
         self.y -= self.mass*cell_size
@@ -274,8 +271,8 @@ class Enemy(Widget):
 
 class Tank(Widget):
     cannon_angle = NumericProperty(0)
-    speed = NumericProperty(20)
-    mass = NumericProperty(0.5)
+    speed = NumericProperty(0.2)
+    mass = NumericProperty(0.3)
     last_timepoint = NumericProperty(0)
     
     bullet_preds = ListProperty([])
@@ -359,10 +356,7 @@ class Tank(Widget):
             bullet.angle = self.cannon_angle
             bullet.pos = [self.center_x + (self.cannon_length *2) * math.cos(self.cannon_angle)-bullet.radius, self.center_y + (self.cannon_length *2) * math.sin(self.cannon_angle)-bullet.radius]
             bullet.color = (0.5, 0.5, 0.5, 1)
-            
-            bullet.init_x = bullet.x
-            bullet.init_y = bullet.y
-            
+                        
             bullet.effect_diameter = weapon.get("effect_diameter", None)
             bullet.mass = weapon.get("mass", None)*game.cell_size
             bullet.speed = weapon.get("speed", None)*game.cell_size
@@ -384,11 +378,11 @@ class Tank(Widget):
             
             self.last_timepoint = time.time()
     
-    def move_right(self, cell_size, dt):
-        self.x += self.speed*cell_size*dt
+    def move_right(self, cell_size):
+        self.x += self.speed*cell_size
     
-    def move_left(self, cell_size, dt):
-        self.x -= self.speed*cell_size*dt
+    def move_left(self, cell_size):
+        self.x -= self.speed*cell_size
     
     def fall(self, cell_size):
         self.y -= self.mass*cell_size
@@ -439,6 +433,15 @@ class Tank(Widget):
             self.reload_bar_lenght = self.width * 1.6 * (time.time() - self.last_timepoint)/self.reload_time
             self.reload_bar.points = (self.x - self.width * 0.3, self.top + self.height * 0.3,
                                 self.x - self.width * 0.3 + self.reload_bar_lenght, self.top + self.height * 0.3)
+            
+    def switch_weapon(self, weapon):
+        self.ammo = 0
+        self.max_ammo = weapon["ammo_number"]
+        self.reload_time = weapon["reload_speed"]
+        self.reloading = False
+        self.last_timepoint = time.time()
+        self.reload_weapon()
+        
 
         
 #------------------------------------------------------------------------- bullets -------------------------------------------------------------------------#
@@ -451,10 +454,7 @@ class Bullet(Widget):
     angle = NumericProperty(0)
     radius = NumericProperty(5)
     drill = NumericProperty(0)
-    
-    init_x = NumericProperty(0)
-    init_y = NumericProperty(0)
-    
+        
     repeat_explosions = BooleanProperty(False)
     laser = BooleanProperty(False)
     rays = ListProperty([])
@@ -480,8 +480,8 @@ class Bullet(Widget):
     def trajectory(self):
         # Convert speed to units per second
         self.prev_coordinates = [self.x,self.y]
-        self.x = self.init_x + self.speed * math.cos(self.angle) * self.flighttime
-        self.y = self.init_y + self.speed * math.sin(self.angle) * self.flighttime - 0.5 * self.mass * self.flighttime * self.flighttime
+        self.x += self.speed * math.cos(self.angle)
+        self.y += self.speed * math.sin(self.angle) - self.mass*(self.flighttime+1)
         self.flighttime += 1
             
     def explode(self, game):
@@ -490,22 +490,21 @@ class Bullet(Widget):
         game.explosion_group.add(explosion)
         
     def recalculate_angle(self, normal_vector):
-        # Calculate the angle of incidence
-        angle_incidence = math.atan2(self.speed * math.sin(self.angle), self.speed * math.cos(self.angle))
+        # Calculate the angle of incidence based on the bullet's current velocity
+        angle_of_incidence = math.atan2(self.speed * math.sin(self.angle), self.speed * math.cos(self.angle))
 
         # Calculate the angle between the normal vector and the horizontal axis
         angle_normal = math.atan2(normal_vector[1], normal_vector[0])
 
-        # Calculate the angle of reflection (angle of incidence - angle of normal)
-        angle_reflection = 2 * angle_normal - angle_incidence
-
-        # Normalize the angle to the range [0, 2*pi) or [0, 360 degrees)
+        # Calculate the angle of reflection using the angle of incidence and the angle between the normal vector and the horizontal axis
+        angle_reflection = 2 * angle_normal - angle_of_incidence + math.pi
+        
+        # Normalize the angle to ensure it falls within the appropriate range
         self.angle = angle_reflection % (2 * math.pi)
 
         # Convert the angle back to the range [-pi, pi) or [-180, 180 degrees)
         if self.angle > math.pi:
             self.angle -= 2 * math.pi
-
 #------------------------------------------------------------------------- explosions -------------------------------------------------------------------------#
 
 class Explosion(Widget):
@@ -532,12 +531,13 @@ class Explosion(Widget):
 class CannonGame(Widget):
     tank = ObjectProperty(None)
     enemy = ObjectProperty(None)
-    fps = NumericProperty(0)
+    fps = NumericProperty(120)
     keys_up = ListProperty([])
-    fullscreen = BooleanProperty(True)
+    fullscreen = BooleanProperty(False)
     
     chunk_size = NumericProperty(2)
-    chunk_number = NumericProperty(100)
+    #s=60 m=75 l=100
+    chunk_number = NumericProperty(40)
     chunks = ListProperty([])
 
     def __init__(self, **kwargs):
@@ -545,11 +545,11 @@ class CannonGame(Widget):
 
         self.weapons = [{
             "name": "Bullet",
-            "mass": 0.05,
+            "mass": 0.025,
             "effect_diameter": 15,
-            "speed": 2,
+            "speed": 1,
             "firerate": 2,
-            "reload_speed": 4,
+            "reload_speed": 1,
             "ammo_number": 5,
             "radius": 0.5,
             "drill": 0,
@@ -562,7 +562,7 @@ class CannonGame(Widget):
             "effect_diameter": 10,
             "speed": 2,
             "firerate": 3,
-            "reload_speed": 6,
+            "reload_speed": 1,
             "ammo_number": 30,
             "radius": 0.3,
             "drill": 40,
@@ -575,7 +575,7 @@ class CannonGame(Widget):
             "effect_diameter": 1,
             "speed": 1,
             "firerate": 3,
-            "reload_speed": 6,
+            "reload_speed": 1,
             "ammo_number": 30,
             "radius": 0.5,
             "drill": 100,
@@ -588,7 +588,7 @@ class CannonGame(Widget):
         
         self.enemy_weapon = {
             "name": "sniper",
-            "mass": 0.01,
+            "mass": 0.1,
             "effect_diameter": 2,
             "speed": 2,
             "firerate": 5,
@@ -613,10 +613,10 @@ class CannonGame(Widget):
             self.chunks.append({"ground":[], "explosions":[], "bullets":[], "obstacles":[], "x_limit":(((i+1)*self.chunk_size-self.chunk_size)*self.cell_size, ((i+1)*self.chunk_size)*self.cell_size)})
         
         # Define the parameters for scaling
-        amplitude = 5  # Half of the peak-to-peak height (from -1 to 1)
-        frequency = 2
-        offset_y = 20
-        offset_x = 10
+        amplitude = random.randint(3, 11)  # Half of the peak-to-peak height (from -1 to 1)
+        frequency = random.randint(1, 5)
+        offset_y = amplitude +10
+        offset_x = random.randint(0, int(self.grid_size_x/frequency))
         # Calculate the heights using a sine function
         self.heights = []
         for x in range(self.grid_size_x):
@@ -666,7 +666,6 @@ class CannonGame(Widget):
         # Generate terrain
         
         x_offset = (self.width - self.grid_size_x * self.cell_size) / 2
-        y_offset = 0
 
         x = 0
         chunk = 0
@@ -682,10 +681,17 @@ class CannonGame(Widget):
                 ground = Ground()
                 if y == self.heights[x]-1:
                     ground_color = Color(0.1, 1, 0.1) # set color
+                    ground.elastic = True # set elastic
+                    ground.reflective = True # set
                 elif y == self.heights[x]-2:
                     ground_color = Color(0.1, 0.9, 0.1) # set color
+                    ground.elastic = True # set elastic
+                    ground.reflective = True # set
+
                 elif y == self.heights[x]-3:
                     ground_color = Color(0, 0.8, 0) # set color
+                    ground.elastic = True # set elastic
+                    ground.reflective = True # set
                     
                 elif y < 1:
                     ground_color = Color(0.3, 0.3, 0.3)  
@@ -694,7 +700,7 @@ class CannonGame(Widget):
                     ground_color = Color(0.6, 0.3, 0)
                     
                 ground.canvas.add(ground_color)
-                ground_pos_y = (y * self.cell_size) + y_offset
+                ground_pos_y = (y * self.cell_size) 
                 ground_rectangle = Rectangle(pos=((x * self.cell_size)+x_offset, ground_pos_y), size=(self.cell_size, self.cell_size))
                 ground.canvas.add(ground_rectangle)
                 ground.size_hint = (None, None)
@@ -704,6 +710,27 @@ class CannonGame(Widget):
                 self.chunks[chunk]["ground"].append(ground)
                 self.ground_tiles.add(ground)  # Add ground to the group
                 self.add_widget(ground)
+                
+            if x%8 == 0:
+                h = self.heights[x]
+                for i in range(10):
+                    obstacle = Ground()
+                    obstacle_color = Color(0,0,1)
+                    obstacle.canvas.add(obstacle_color)
+                    obstacle_pos_y = (h * self.cell_size + i * self.cell_size)
+                    obstacle_rectangle = Rectangle(pos=((x * self.cell_size)+x_offset, obstacle_pos_y), size=(self.cell_size, self.cell_size))
+                    obstacle.canvas.add(obstacle_rectangle)
+                    obstacle.size = (self.cell_size, self.cell_size)
+                    obstacle.pos=((x * self.cell_size)+x_offset, obstacle_pos_y)
+                    
+                    obstacle.elastic = True
+                    obstacle.reflective = True
+                    
+                    self.chunks[chunk]["ground"].append(obstacle)
+                    self.ground_tiles.add(obstacle)  # Add ground to the group
+                    self.add_widget(obstacle)
+
+
 
             x += 1
 
@@ -785,8 +812,8 @@ class CannonGame(Widget):
     def update(self, dt):
         
         # Calculate movement distance based on normalized speed
-        movement_distance = self.tank.speed*self.cell_size*dt # Adjust speed based on screen size
-        tank_falling_distance = self.tank.mass*self.cell_size*dt
+        movement_distance = self.tank.speed*self.cell_size # Adjust speed based on screen size
+        tank_falling_distance = self.tank.mass*self.cell_size
         
         tank_ground_to_render = []
         enemy_ground_to_render = []
@@ -809,11 +836,11 @@ class CannonGame(Widget):
                     tank_ground_to_render.extend(self.chunks[i]["ground"])
                     tank_processed_chunks.add(i)
 
-                if i - 1 > -1 and (i - 1) not in tank_processed_chunks:
+                if i - 1 > -1 and (i - 1) not in tank_processed_chunks and ("left" in self.keys_pressed or "a" in self.keys_pressed):
                     tank_ground_to_render.extend(self.chunks[i - 1]["ground"])
                     tank_processed_chunks.add(i - 1)
 
-                if i + 1 < self.chunk_number and (i + 1) not in tank_processed_chunks:
+                if i + 1 < self.chunk_number and (i + 1) not in tank_processed_chunks and ("right" in self.keys_pressed or "d" in self.keys_pressed):
                     tank_ground_to_render.extend(self.chunks[i + 1]["ground"])
                     tank_processed_chunks.add(i + 1)
             
@@ -838,11 +865,11 @@ class CannonGame(Widget):
                         bullet_ground_to_render.extend(self.chunks[i]["ground"])
                         bullet_processed_chunks.add(i)
 
-                    if i - 1 > -1 and (i - 1) not in bullet_processed_chunks:
+                    if i - 1 > -1 and (i - 1) not in bullet_processed_chunks and bullet.prev_coordinates[0] > bullet.x:
                         bullet_ground_to_render.extend(self.chunks[i - 1]["ground"])
                         bullet_processed_chunks.add(i - 1)
 
-                    if i + 1 < self.chunk_number and (i + 1) not in bullet_processed_chunks:
+                    if i + 1 < self.chunk_number and (i + 1) not in bullet_processed_chunks and bullet.prev_coordinates[0] < bullet.x:
                         bullet_ground_to_render.extend(self.chunks[i + 1]["ground"])
                         bullet_processed_chunks.add(i + 1)
                         
@@ -960,14 +987,13 @@ class CannonGame(Widget):
                         target_x=self.tank.center_x, 
                         target_y=self.tank.center_y, 
                         speed=self.enemy_weapon["speed"]*self.cell_size, 
-                        g=self.enemy_weapon["mass"]*self.cell_size,
-                        dt=dt)#move the player cannon
+                        g=self.enemy_weapon["mass"]*self.cell_size)#move the player cannon
 
         enemy_range_x = (self.enemy.x - self.cell_size * 2, self.enemy.x + self.cell_size * 2)#we use theese to improve performance by checking collision of only neraby objects
         enemy_range_y = (self.enemy.y - self.cell_size * 2, self.enemy.y + self.cell_size * 2)
         
-        enemy_movement_distance = self.enemy.speed*self.cell_size*dt # Adjust speed based on screen size
-        enemy_falling_distance = self.enemy.mass*self.cell_size*dt
+        enemy_movement_distance = self.enemy.speed*self.cell_size # Adjust speed based on screen size
+        enemy_falling_distance = self.enemy.mass*self.cell_size
 
         enemy_touching = False
 
@@ -1027,10 +1053,10 @@ class CannonGame(Widget):
                 
         # Move tank horizontally
         if right:
-            self.tank.move_right(cell_size=self.cell_size, dt=dt)
+            self.tank.move_right(cell_size=self.cell_size)
 
         if left:
-            self.tank.move_left(cell_size=self.cell_size, dt=dt)
+            self.tank.move_left(cell_size=self.cell_size)
 
         self.tank.set_cannon_angle(self.mouse)#move the player cannon
             
@@ -1040,10 +1066,10 @@ class CannonGame(Widget):
                 self.enemy.y = self.cell_size+1
         
         if enemy_right:
-            self.enemy.move_right(cell_size=self.cell_size, dt=dt)
+            self.enemy.move_right(cell_size=self.cell_size)
 
         if enemy_left:
-            self.enemy.move_left(cell_size=self.cell_size, dt=dt)
+            self.enemy.move_left(cell_size=self.cell_size)
             
 
         #-------------neutral functions --------------------------------
@@ -1099,7 +1125,7 @@ class CannonGame(Widget):
                         left_side = ((g[0], g[1]), (g[0], g[3]))
                         right_side = ((g[2], g[1]), (g[2], g[3]))
                         
-                        nearest = self.nearest_side([bullet.x + bullet.radius, bullet.y+bullet.radius], ground.pos, ground.size[0])
+                        nearest = self.nearest_side([bullet.prev_coordinates[0] + bullet.radius, bullet.prev_coordinates[1] + bullet.radius], ground.pos, ground.size[0])
                         
                         if nearest == "top":
                             # Collision with the top side
@@ -1127,8 +1153,8 @@ class CannonGame(Widget):
                         bottom_side = ((g[0], g[1]), (g[2], g[1]))
                         left_side = ((g[0], g[1]), (g[0], g[3]))
                         right_side = ((g[2], g[1]), (g[2], g[3]))
-                        
-                        nearest = self.nearest_side([bullet.x + bullet.radius, bullet.y+bullet.radius], ground.pos, ground.size[0])
+                                                
+                        nearest = self.nearest_side([bullet.prev_coordinates[0] + bullet.radius, bullet.prev_coordinates[1] + bullet.radius], ground.pos, ground.size[0])
                         
                         if nearest == "top":
                             # Collision with the top side
@@ -1144,11 +1170,11 @@ class CannonGame(Widget):
 
                         elif nearest == "left":
                             # Collision with the left side
-                            normal_vector = [0, 1]  # Normal vector pointing to the left   
+                            normal_vector = [0, 0]  # Normal vector pointing to the left   
 
+                        bullet.speed=bullet.speed*0.9
                         bullet.pos=bullet.prev_coordinates
                         bullet.flighttime=0
-                        bullet.speed=bullet.speed*0.9
             
                         bullet.recalculate_angle(normal_vector)
                         
@@ -1180,6 +1206,8 @@ class CannonGame(Widget):
                 self.current_weapon = 0
             else:
                 self.current_weapon += 1
+            self.tank.switch_weapon(self.weapons[self.current_weapon])    
+            
                             
 
         for bullet in bullets_to_remove:
@@ -1301,22 +1329,70 @@ class CannonGame(Widget):
     def nearest_side(self, point, bottom_left, width):
         x, y = point
         bx, by = bottom_left
-        distance_top = abs(y - (by + width))
-        distance_bottom = abs(y - by)
-        distance_left = abs(x - bx)
-        distance_right = abs(x - (bx + width))
+        half_width = width / 2
         
-        min_distance = min(distance_top, distance_bottom, distance_left, distance_right)
+        # Calculate distances to each corner of the square
+        distances_to_corners = [
+            math.sqrt((x - bx) ** 2 + (y - by) ** 2),  # Bottom-left corner
+            math.sqrt((x - bx - width) ** 2 + (y - by) ** 2),  # Bottom-right corner
+            math.sqrt((x - bx) ** 2 + (y - by - width) ** 2),  # Top-left corner
+            math.sqrt((x - bx - width) ** 2 + (y - by - width) ** 2)  # Top-right corner
+        ]
         
-        if min_distance == distance_top:
-            return "top"
-        elif min_distance == distance_bottom:
-            return "bottom"
-        elif min_distance == distance_left:
-            return "left"
+        # Find the minimum distance to any corner
+        min_distance_to_corner = min(distances_to_corners)
+        
+        # Define a threshold for corner detection
+        corner_threshold = 0.5 * width  # Adjust as needed
+        
+        if min_distance_to_corner <= corner_threshold:
+            # Projectile is close to a corner
+            min_distance_index = distances_to_corners.index(min_distance_to_corner)
+            # Determine the sides involved based on the closest corner
+            if min_distance_index == 0:  # Bottom-left corner
+                # Determine if the projectile is closer to the left or bottom side
+                if x - bx < y - by:
+                    return "left"
+                else:
+                    return "bottom"
+            elif min_distance_index == 1:  # Bottom-right corner
+                # Determine if the projectile is closer to the right or bottom side
+                if bx + width - x < y - by:
+                    return "right"
+                else:
+                    return "bottom"
+            elif min_distance_index == 2:  # Top-left corner
+                # Determine if the projectile is closer to the left or top side
+                if x - bx < by + width - y:
+                    return "left"
+                else:
+                    return "top"
+            else:  # Top-right corner
+                # Determine if the projectile is closer to the right or top side
+                if bx + width - x < by + width - y:
+                    return "right"
+                else:
+                    return "top"
         else:
-            return "right"
-    
+            # No corner collision, proceed with detecting the nearest side
+            # Calculate distances to each side of the square
+            distance_top = abs(y - (by + width))
+            distance_bottom = abs(y - by)
+            distance_left = abs(x - bx)
+            distance_right = abs(x - (bx + width))
+
+            # Find the minimum distance
+            min_distance = min(distance_top, distance_bottom, distance_left, distance_right)
+
+            # Determine the nearest side based on the minimum distance
+            if min_distance == distance_top:
+                return "top"
+            elif min_distance == distance_bottom:
+                return "bottom"
+            elif min_distance == distance_left:
+                return "left"
+            else:
+                return "right"    
 #-------------------------------------------------------------------------keyboard control functions-------------------------------------------------------------------------#    
     def keyboard_closed(self):
         self.keyboard.unbind(on_key_down=self.on_key_down)
