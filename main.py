@@ -23,16 +23,6 @@ class Ground(Widget):
         with self.canvas:
             Color(0.6, 0.3, 0)     
 
-from kivy.uix.widget import Widget
-from kivy.properties import BooleanProperty, NumericProperty, ListProperty
-from kivy.graphics import Color, Ellipse, Line
-import math
-
-from kivy.uix.widget import Widget
-from kivy.properties import BooleanProperty, NumericProperty, ListProperty
-from kivy.graphics import Color, Ellipse, Line
-import math
-
 class Obstacle(Widget):
     gravity = BooleanProperty(False)
     wormhole = BooleanProperty(False)
