@@ -23,79 +23,121 @@ class Ground(Widget):
         with self.canvas:
             Color(0.6, 0.3, 0)     
 
+from kivy.uix.widget import Widget
+from kivy.properties import BooleanProperty, NumericProperty, ListProperty
+from kivy.graphics import Color, Ellipse, Line
+import math
+
+from kivy.uix.widget import Widget
+from kivy.properties import BooleanProperty, NumericProperty, ListProperty
+from kivy.graphics import Color, Ellipse, Line
+import math
+
 class Obstacle(Widget):
     gravity = BooleanProperty(False)
     wormhole = BooleanProperty(False)
-    radius = NumericProperty(1)
+    radius = NumericProperty(3)
     effectRadius = NumericProperty(10)
     attraction = NumericProperty(3)
     repulsive = BooleanProperty(False)
     wormhole_exit = ListProperty([])
-    
-    def __init__(self, cell_size, gravity = False, wormhole=False, wormhole_exit=[0,0], **kwargs):
+
+    def __init__(self, cell_size, gravity=False, wormhole=False, wormhole_exit=[0, 0], color=(0, 0, 0), **kwargs):
         super().__init__(**kwargs)
         self.cell_size = cell_size
         self.gravity = gravity
         self.wormhole = wormhole
         self.wormhole_exit = wormhole_exit
-        
+
         with self.canvas:
             # Draw the obstacle (circle)
-            Color(0, 0, 0)
-            self.obstacle = Ellipse(pos=(self.center_x-self.radius*self.cell_size, self.center_y-self.radius*self.cell_size), size=(self.radius*2*self.cell_size, self.radius*2*self.cell_size))
+            Color(color[0], color[0], color[0])
+            self.obstacle = Ellipse(pos=(self.center_x - self.radius * self.cell_size, self.center_y - self.radius * self.cell_size), 
+                                    size=(self.radius * 2 * self.cell_size, self.radius * 2 * self.cell_size))
 
             if self.gravity:
-                obstacle_center = (self.pos[0] + self.obstacle.size[0] / 2, self.pos[1] + self.obstacle.size[1] / 2)
+                # Draw the effect radius ring around the obstacle
+                Color(1, 0, 0, 0.5)  # Red color with 50% opacity
+                self.effect_radius_ring = Line(circle=(self.center_x, self.center_y, self.effectRadius * self.cell_size), width=1.1)
 
-                # Draw the effect radius ring
-                Color(0, 0, 0,)  # Red color with 50% opacity
-                self.effect_radius_ring = Line(circle=(self.center_x, self.center_y, self.effectRadius * self.cell_size), width=1.1)            
-            
-            if wormhole:
-                Color(1, 1, 1)
-                
-                self.wormhole = Ellipse(pos=self.wormhole_exit, size=(self.radius*2*self.cell_size, self.radius*2*self.cell_size))
-                        
+            if self.wormhole:
+                # Draw the wormhole exit
+                Color(color[0], color[0], color[0])
+                self.wormhole_exit_circle = Ellipse(pos=(self.wormhole_exit[0] - self.radius * self.cell_size, self.wormhole_exit[1] - self.radius * self.cell_size), 
+                                                    size=(self.radius * 2 * self.cell_size, self.radius * 2 * self.cell_size))
+                if self.gravity:
+                    # Draw the effect radius ring around the wormhole exit
+                    Color(1, 0, 0, 0.5)  # Red color with 50% opacity
+                    self.effect_radius_exit_ring = Line(circle=(self.wormhole_exit[0], self.wormhole_exit[1], self.effectRadius * self.cell_size), width=1.1)
+
         self.bind(pos=self.update_obstacle_position, size=self.update_obstacle_position)
 
     def update_obstacle_position(self, *args):
         # Update the position of the obstacle and effect radius ring when the widget's position changes
-        self.obstacle.pos = (self.center_x, self.center_y)
-        self.obstacle.size = self.size
-        self.effect_radius_ring.circle = (self.center_x, self.center_y, self.effectRadius)
+        self.obstacle.pos = (self.center_x - self.radius * self.cell_size, self.center_y - self.radius * self.cell_size)
+        self.obstacle.size = (self.radius * 2 * self.cell_size, self.radius * 2 * self.cell_size)
+        self.effect_radius_ring.circle = (self.center_x, self.center_y, self.effectRadius * self.cell_size)
         
+        if self.wormhole:
+            self.wormhole_exit_circle.pos = (self.wormhole_exit[0] - self.radius * self.cell_size, self.wormhole_exit[1] - self.radius * self.cell_size)
+            self.wormhole_exit_circle.size = (self.radius * 2 * self.cell_size, self.radius * 2 * self.cell_size)
+            self.effect_radius_exit_ring.circle = (self.wormhole_exit[0], self.wormhole_exit[1], self.effectRadius * self.cell_size)
+
     def apply_gravity(self, bullet):
-        # Calculate distance between bullet and obstacle
         dist_x = self.center_x - bullet.center_x
         dist_y = self.center_y - bullet.center_y
-        distance = max(1, math.sqrt(dist_x ** 2 + dist_y ** 2))  # Avoid division by zero
-        
-        # Calculate unit vector pointing towards the obstacle's center
+        distance = max(1, math.sqrt(dist_x ** 2 + dist_y ** 2))
+
         unit_vector_x = dist_x / distance
         unit_vector_y = dist_y / distance
-        
-        # Apply attraction force
+
         if distance < self.effectRadius * self.cell_size:
             force_direction = -1 if self.repulsive else 1
             force = (self.attraction * self.cell_size)
-            # Update bullet position towards the center of the obstacle
             bullet.x += force * unit_vector_x * bullet.mass * force_direction 
             bullet.y += force * unit_vector_y * bullet.mass * force_direction
-            
+
+        # Apply repulsive force at wormhole exit
+        dist_x_exit = self.wormhole_exit[0] - bullet.center_x
+        dist_y_exit = self.wormhole_exit[1] - bullet.center_y
+        distance_exit = max(1, math.sqrt(dist_x_exit ** 2 + dist_y_exit ** 2))
+
+        unit_vector_x_exit = dist_x_exit / distance_exit
+        unit_vector_y_exit = dist_y_exit / distance_exit
+
+        if distance_exit < self.effectRadius * self.cell_size:
+            force_direction = -1 if self.repulsive else 1
+            force = (self.attraction * self.cell_size)
+            bullet.x += force * unit_vector_x_exit * bullet.mass * force_direction
+            bullet.y += force * unit_vector_y_exit * bullet.mass * force_direction
+
     def wormholeCheck(self, bullet):
-        dist_x = self.center_x - bullet.center_x
-        dist_y = self.center_y - bullet.center_y
-        distance = math.sqrt(dist_x ** 2 + dist_y ** 2)  # Avoid division by zero
+        # Check distance from entrance
+        dist_x_entrance = self.center_x - bullet.center_x
+        dist_y_entrance = self.center_y - bullet.center_y
+        distance_entrance = math.sqrt(dist_x_entrance ** 2 + dist_y_entrance ** 2)
+
+        if distance_entrance < self.radius * 2 * self.cell_size / 2:
+            bullet.x = self.wormhole_exit[0] + self.wormhole_exit_circle.size[0] / 2
+            bullet.y = self.wormhole_exit[1] + self.wormhole_exit_circle.size[1] / 2
+            return
         
-        if distance < self.radius*2 * self.cell_size/2:
-            bullet.x = self.wormhole_exit[0]+self.wormhole.size[0]/2
-            bullet.y = self.wormhole_exit[1]+self.wormhole.size[0]/2
+        # Check distance from exit
+        dist_x_exit = self.wormhole_exit[0] - bullet.center_x
+        dist_y_exit = self.wormhole_exit[1] - bullet.center_y
+        distance_exit = math.sqrt(dist_x_exit ** 2 + dist_y_exit ** 2)
+
+        if distance_exit < self.radius * 2 * self.cell_size / 2:
+            bullet.x = self.center_x + self.obstacle.size[0] / 2
+            bullet.y = self.center_y + self.obstacle.size[1] / 2
+
+
+
 #-------------------------------------------------------------------------enemy target-------------------------------------------------------------------------#
 class Enemy(Widget):
     cannon_angle = NumericProperty(math.pi)
     speed = NumericProperty(0.2)
     mass = NumericProperty(0.3)
-    health = NumericProperty(5)
     last_shot_time = NumericProperty(0)
 
     bullet_preds = ListProperty([])
@@ -103,15 +145,15 @@ class Enemy(Widget):
     dot_size = 1
     
     #ai_settings
-    direct_hitter = BooleanProperty(True)
-    imprecision = NumericProperty(0.001)
+    direct_hitter = BooleanProperty(False)
+    imprecision = NumericProperty(0.1)
     weapon_range = NumericProperty(300)
     moving = BooleanProperty(True)
     
     reloading = BooleanProperty(False)
     reload_bar_lenght = NumericProperty(0)
 
-    def __init__(self, ammo, max_ammo, reload_time, **kwargs):
+    def __init__(self, ammo, max_ammo, reload_time, health=5, **kwargs):
         super().__init__(**kwargs)
         with self.canvas:
             # Draw the tank body (rectangle)
@@ -122,18 +164,33 @@ class Enemy(Widget):
             self.cannon_length = self.size[1] * 0.3  # Adjust the length of the cannon as needed
             self.cannon_width = self.size[0] * 0.03  # Adjust the width of the cannon as needed
             self.cannon = Line(points=(self.center_x, self.center_y, 
-                                        self.center_x + self.cannon_length, self.center_y + self.cannon_width), width=self.cannon_width)
+                                    self.center_x + self.cannon_length, self.center_y + self.cannon_width), width=self.cannon_width)
             
             self.ammo = ammo
             self.max_ammo = max_ammo
             self.reload_time = reload_time
+            self.health=health
+            self.max_health = health
 
             self.cannon_length = self.size[1] * 0.3  # Adjust the length of the cannon as needed
             self.cannon_width = self.size[0] * 0.02  # Adjust the width of the cannon as needed
             self.reload_bar_lenght = self.width * 1.6 * self.ammo/self.max_ammo
-            
-            Color(1,1,1,1)
+            self.health_bar_lenght = self.width * 1.6 * self.health/self.max_health
+            self.max_bar_lenght = self.width * 1.6 
+
+            Color(1, 0.9, 0, 0.3)
+            self.max_reload_bar = Line(points=(self.x-self.width*0.1, self.top + self.height*0.3, self.right+self.width*0.1, self.top + self.height*0.3), width=self.height*0.05)
+
+            Color(1,0.9,0,1)
             self.reload_bar = Line(points=(self.x-self.width*0.1, self.top + self.height*0.3, self.right+self.width*0.1, self.top + self.height*0.3), width=self.height*0.05)
+
+            Color(1,0,0,0.3)
+            self.max_health_bar = Line(points=(self.x-self.width*0.1, self.top + self.height*0.7, self.right+self.width*0.1, self.top + self.height*0.7), width=self.height*0.05)
+
+            Color(1,0,0)
+            self.health_bar = Line(points=(self.x-self.width*0.1, self.top + self.height*0.7, self.right+self.width*0.1, self.top + self.height*0.7), width=self.height*0.05)
+
+
 
         self.bind(pos=self.update_rect, size=self.update_rect)
 
@@ -151,13 +208,36 @@ class Enemy(Widget):
         
         if not self.reloading:
             self.reload_bar_lenght = self.width * 1.6 * self.ammo/self.max_ammo
-        
+            
+        self.health_bar_lenght = self.width * 1.6 * self.health/self.max_health
+        self.max_bar_lenght = self.width * 1.6 
+
+                
         # Update the reload bar
         reload_bar_height = self.height * 0.12  # Adjust the width of the reload bar as needed
         self.reload_bar.points = (self.x + self.width +self.width * 0.3 - self.reload_bar_lenght, self.top + self.height * 0.3,
                                  self.x + self.width * 1.3 , self.top + self.height * 0.3)
         
-        self.reload_bar.width = reload_bar_height    
+        self.max_reload_bar.points = (self.x - self.width * 0.3, self.top + self.height * 0.3,
+                            self.x - self.width * 0.3 + self.max_bar_lenght, self.top + self.height * 0.3)
+
+        health_bar_height = self.height * 0.12  # Adjust the width of the reload bar as needed
+        self.health_bar.points = (self.x + self.width +self.width * 0.3 - self.health_bar_lenght, self.top + self.height * 0.7,
+                                 self.x + self.width * 1.3 , self.top + self.height * 0.7)
+        
+        self.max_health_bar.points = (self.x - self.width * 0.3, self.top + self.height * 0.7,
+                                self.x - self.width * 0.3 + self.max_bar_lenght, self.top + self.height * 0.7)
+
+        self.health_bar.width = health_bar_height        
+        self.reload_bar.width = reload_bar_height 
+        self.max_health_bar.width = health_bar_height   
+        self.max_reload_bar.width = reload_bar_height   
+        
+    def update_health_bar():
+        self.health_bar_lenght = self.width * 1.6 * self.health/self.max_health
+        self.health_bar.points = (self.x + self.width +self.width * 0.3 - self.health_bar_lenght, self.top + self.height * 0.3,
+                                 self.x + self.width * 1.3 , self.top + self.height * 0.3)
+
 
     def shoot(self, game):
         weapon = game.enemy_weapon
@@ -293,6 +373,7 @@ class Tank(Widget):
             self.rect = Rectangle(source=self.tank_image_source, pos=self.pos, size=self.size)
             
             self.health = health
+            self.max_health = health
             self.ammo = ammo
             self.max_ammo = max_ammo
             self.reload_time = reload_time
@@ -301,12 +382,23 @@ class Tank(Widget):
             self.cannon_length = self.size[1] * 0.3  # Adjust the length of the cannon as needed
             self.cannon_width = self.size[0] * 0.02  # Adjust the width of the cannon as needed
             self.reload_bar_lenght = self.width * 1.6 * self.ammo/self.max_ammo
+            self.health_bar_lenght = self.width * 1.6 * self.health/self.max_health
+            self.max_bar_lenght = self.width * 1.6
 
             self.cannon = Line(points=(self.x - self.width * 0.3, self.top + self.height * 0.3,
                                  self.x - self.width * 0.3 + self.reload_bar_lenght, self.top + self.height * 0.3), width=self.cannon_width)
             
-            Color(1,1,1,1)
+            Color(1,0.9,0,0.3)
+            self.max_reload_bar = Line(points=(self.x-self.width*0.1, self.top + self.height*0.3, self.right+self.width*0.1, self.top + self.height*0.3), width=self.height*0.05)
+            
+            Color(1,0.9,0,1)
             self.reload_bar = Line(points=(self.x-self.width*0.1, self.top + self.height*0.3, self.right+self.width*0.1, self.top + self.height*0.3), width=self.height*0.05)
+            
+            Color(1,0,0,0.3)
+            self.max_health_bar = Line(points=(self.x-self.width*0.1, self.top + self.height*0.7, self.right+self.width*0.1, self.top + self.height*0.7), width=self.height*0.05)
+
+            Color(1,0,0,1)
+            self.health_bar = Line(points=(self.x-self.width*0.1, self.top + self.height*0.7, self.right+self.width*0.1, self.top + self.height*0.7), width=self.height*0.05)
 
         self.bind(pos=self.update_rect, size=self.update_rect)
 
@@ -326,14 +418,34 @@ class Tank(Widget):
         if not self.reloading:
             self.reload_bar_lenght = self.width * 1.6 * self.ammo/self.max_ammo
         
+        self.health_bar_lenght = self.width * 1.6 * self.health/self.max_health
+        self.max_bar_lenght = self.width * 1.6
+
         # Update the reload bar
         reload_bar_height = self.height * 0.12  # Adjust the width of the reload bar as needed
         self.reload_bar.points = (self.x - self.width * 0.3, self.top + self.height * 0.3,
                                  self.x - self.width * 0.3 + self.reload_bar_lenght, self.top + self.height * 0.3)
         
-        self.reload_bar.width = reload_bar_height    
-            
+        self.max_reload_bar.points = (self.x - self.width * 0.3, self.top + self.height * 0.3,
+                                 self.x - self.width * 0.3 + self.max_bar_lenght, self.top + self.height * 0.3)
 
+        health_bar_height = self.height * 0.12  # Adjust the width of the reload bar as needed
+        self.health_bar.points = (self.x - self.width * 0.3, self.top + self.height * 0.7,
+                                 self.x - self.width * 0.3 + self.health_bar_lenght, self.top + self.height * 0.7)
+        
+        self.max_health_bar.points = (self.x - self.width * 0.3, self.top + self.height * 0.7,
+                                 self.x - self.width * 0.3 + self.max_bar_lenght, self.top + self.height * 0.7)
+
+
+        self.health_bar.width = health_bar_height
+        self.reload_bar.width = reload_bar_height 
+        self.max_health_bar.width = health_bar_height   
+        self.max_reload_bar.width = reload_bar_height   
+            
+    def update_health_bar(self):
+        self.health_bar_lenght = self.width * 1.6 * self.health/self.max_health
+        self.health_bar.points = (self.x - self.width * 0.3, self.top + self.height * 0.7,
+                                 self.x - self.width * 0.3 + self.health_bar_lenght, self.top + self.height * 0.7)
         
     def set_cannon_angle(self, mouse_pos):
         """Set the angle of the cannon based on the mouse position."""
@@ -372,7 +484,7 @@ class Tank(Widget):
             self.reload_bar_lenght = self.width * 1.6 * self.ammo/self.max_ammo
             self.reload_bar.points = (self.x - self.width * 0.3, self.top + self.height * 0.3,
                                  self.x - self.width * 0.3 + self.reload_bar_lenght, self.top + self.height * 0.3)
-
+            
             if self.ammo <= 0:
                 self.reload_weapon()
             
@@ -413,6 +525,7 @@ class Tank(Widget):
     
     def hit(self, damage = 1):
         self.health -= damage
+        self.update_health_bar()
         if self.health < 1:
             App.get_running_app().stop() 
             
@@ -533,11 +646,11 @@ class CannonGame(Widget):
     enemy = ObjectProperty(None)
     fps = NumericProperty(120)
     keys_up = ListProperty([])
-    fullscreen = BooleanProperty(False)
+    fullscreen = BooleanProperty(True)
     
     chunk_size = NumericProperty(2)
     #s=60 m=75 l=100
-    chunk_number = NumericProperty(40)
+    chunk_number = NumericProperty(random.randint(60, 100))
     chunks = ListProperty([])
 
     def __init__(self, **kwargs):
@@ -578,22 +691,21 @@ class CannonGame(Widget):
             "reload_speed": 1,
             "ammo_number": 30,
             "radius": 0.5,
-            "drill": 100,
+            "drill": 500,
             "repeat_explosions": False,
             "laser": True,
         }]
         
-
         self.current_weapon = 0
         
         self.enemy_weapon = {
             "name": "sniper",
-            "mass": 0.1,
-            "effect_diameter": 2,
+            "mass": 0.04,
+            "effect_diameter": 5,
             "speed": 2,
             "firerate": 5,
             "reload_speed": 6,
-            "ammo_number": 30,
+            "ammo_number": 300,
             "radius": 0.6,
             "drill": 0,
             "repeat_explosions": False,
@@ -657,11 +769,11 @@ class CannonGame(Widget):
 
 #-------------------------------------------------------------------------map generation-------------------------------------------------------------------------#
     def draw_background(self):
-        # Draw the background
-        with self.canvas:
-            Color(0.529, 0.808, 0.922, 1)  # RGBA values (blue)
-            Rectangle(pos=(0, 0),size=(Window.width, Window.height))
-            
+        # Draw the blue sky background
+        with self.canvas.before:
+            Color(0.529, 0.808, 0.922)  # Light blue sky color
+            Rectangle(pos=(0, 0), size=(Window.width, Window.height))   
+                    
     def terrain_gen(self):
         # Generate terrain
         
@@ -681,17 +793,10 @@ class CannonGame(Widget):
                 ground = Ground()
                 if y == self.heights[x]-1:
                     ground_color = Color(0.1, 1, 0.1) # set color
-                    ground.elastic = True # set elastic
-                    ground.reflective = True # set
                 elif y == self.heights[x]-2:
                     ground_color = Color(0.1, 0.9, 0.1) # set color
-                    ground.elastic = True # set elastic
-                    ground.reflective = True # set
-
                 elif y == self.heights[x]-3:
                     ground_color = Color(0, 0.8, 0) # set color
-                    ground.elastic = True # set elastic
-                    ground.reflective = True # set
                     
                 elif y < 1:
                     ground_color = Color(0.3, 0.3, 0.3)  
@@ -710,34 +815,44 @@ class CannonGame(Widget):
                 self.chunks[chunk]["ground"].append(ground)
                 self.ground_tiles.add(ground)  # Add ground to the group
                 self.add_widget(ground)
+            x += 1
+        
+        x = 0
+        chunk = 0
+
+        while x < len(self.heights):
+            if (x +1)%self.chunk_size == 0:    
+                chunk += 1
+                c = 0                
+
+            if x%4 == 0 and x != 0:
+                rand = random.randint(0,10)
+                if rand < 3:
+                    h = self.heights[x]
+                    for i in range(10):
+                        obstacle = Ground()
+                        obstacle_color = Color(0,0,1)
+                        obstacle.canvas.add(obstacle_color)
+                        obstacle_pos_y = (h * self.cell_size + i * self.cell_size)
+                        obstacle_rectangle = Rectangle(pos=((x * self.cell_size)+x_offset, obstacle_pos_y), size=(self.cell_size, self.cell_size))
+                        obstacle.canvas.add(obstacle_rectangle)
+                        obstacle.size = (self.cell_size, self.cell_size)
+                        obstacle.pos=((x * self.cell_size)+x_offset, obstacle_pos_y)
+                        
+                        obstacle.elastic = True
+                        obstacle.reflective = True
+                        
+                        self.chunks[chunk]["ground"].append(obstacle)
+                        self.ground_tiles.add(obstacle)  # Add ground to the group
+                        self.add_widget(obstacle)
                 
-            if x%8 == 0:
-                h = self.heights[x]
-                for i in range(10):
-                    obstacle = Ground()
-                    obstacle_color = Color(0,0,1)
-                    obstacle.canvas.add(obstacle_color)
-                    obstacle_pos_y = (h * self.cell_size + i * self.cell_size)
-                    obstacle_rectangle = Rectangle(pos=((x * self.cell_size)+x_offset, obstacle_pos_y), size=(self.cell_size, self.cell_size))
-                    obstacle.canvas.add(obstacle_rectangle)
-                    obstacle.size = (self.cell_size, self.cell_size)
-                    obstacle.pos=((x * self.cell_size)+x_offset, obstacle_pos_y)
-                    
-                    obstacle.elastic = True
-                    obstacle.reflective = True
-                    
-                    self.chunks[chunk]["ground"].append(obstacle)
-                    self.ground_tiles.add(obstacle)  # Add ground to the group
-                    self.add_widget(obstacle)
-
-
 
             x += 1
 
         
-        #obstacle = Obstacle(cell_size=self.cell_size, gravity=True, wormhole=True, wormhole_exit=(((self.grid_size_x/2)-10)*self.cell_size, ((self.grid_size_y / 2)+10)*self.cell_size), pos=(((self.grid_size_x/2)+10)*self.cell_size, ((self.grid_size_y / 2)+10)*self.cell_size))  # Position the obstacle in the middle of the screen
-        #self.obstacle_group.add(obstacle) # Add obstacle to the group
-        #self.add_widget(obstacle)
+        obstacle = Obstacle(cell_size=self.cell_size, gravity=False, wormhole=True, wormhole_exit=(((self.grid_size_x/2)-10)*self.cell_size, ((self.grid_size_y / 2)+10)*self.cell_size), pos=(((self.grid_size_x/2)+10)*self.cell_size, ((self.grid_size_y / 2)+10)*self.cell_size))  # Position the obstacle in the middle of the screen
+        self.obstacle_group.add(obstacle) # Add obstacle to the group
+        self.add_widget(obstacle)
         
         
     def create_tank(self, new_pos = None):
@@ -748,7 +863,7 @@ class CannonGame(Widget):
         
         
         if new_pos == None:
-            self.tank.pos = (self.cell_size, self.heights[0]*(self.cell_size)+2)
+            self.tank.pos = (self.cell_size, (self.heights[0]+1)*(self.cell_size))
         else:
             self.tank.pos = (new_pos[0], new_pos[1])  # Center tank horizontally
 
@@ -764,7 +879,7 @@ class CannonGame(Widget):
         self.enemy.size = (self.cell_size*2, self.cell_size*2)
 
         if new_pos == None:
-            self.enemy.pos = (self.width-self.cell_size*10-self.enemy.size[0], self.heights[-5]*self.cell_size+2)
+            self.enemy.pos = (self.width-self.cell_size*10-self.enemy.size[0], (self.heights[-5]+2)*self.cell_size)
         else:
             self.enemy.pos = (new_pos[0], new_pos[1])  # Center tank horizontally        
                 
@@ -1172,7 +1287,7 @@ class CannonGame(Widget):
                             # Collision with the left side
                             normal_vector = [0, 0]  # Normal vector pointing to the left   
 
-                        bullet.speed=bullet.speed*0.9
+                        bullet.speed=bullet.speed*0.95
                         bullet.pos=bullet.prev_coordinates
                         bullet.flighttime=0
             
