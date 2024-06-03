@@ -658,8 +658,7 @@ class CannonGame(Widget):
     fullscreen = BooleanProperty(True)
     
     chunk_size = NumericProperty(2)
-    #s=60 m=75 l=100
-    chunk_number = NumericProperty(random.randint(40, 70))
+    chunk_number = NumericProperty(random.randint(50, 50))
     chunks = ListProperty([])
 
     level = NumericProperty(1)
@@ -684,12 +683,12 @@ class CannonGame(Widget):
             "name": "Bombshell",
             "mass": 0.05,
             "effect_diameter": 10,
-            "speed": 2,
+            "speed": 1.3,
             "firerate": 3,
             "reload_speed": 1,
             "ammo_number": 30,
             "radius": 0.3,
-            "drill": 40,
+            "drill": 10,
             "repeat_explosions": False,
             "laser": False,
         },
@@ -736,8 +735,8 @@ class CannonGame(Widget):
             self.chunks.append({"ground":[], "explosions":[], "bullets":[], "obstacles":[], "x_limit":(((i+1)*self.chunk_size-self.chunk_size)*self.cell_size, ((i+1)*self.chunk_size)*self.cell_size)})
         
         # Define the parameters for scaling
-        amplitude = random.randint(3, 11)  # Half of the peak-to-peak height (from -1 to 1)
-        frequency = random.randint(1, 5)
+        amplitude = random.randint(3, 5)  # Half of the peak-to-peak height (from -1 to 1)
+        frequency = random.randint(1, 3)
         offset_y = amplitude +10
         offset_x = random.randint(0, int(self.grid_size_x/frequency))
         # Calculate the heights using a sine function
@@ -782,7 +781,7 @@ class CannonGame(Widget):
     def draw_background(self):
         # Draw the blue sky background
         with self.canvas.before:
-            Rectangle(source="./trincea.png", spos=(0, 0), size=(Window.width, Window.height))   
+            Rectangle(source="./città.png", spos=(0, 0), size=(Window.width, Window.height))   
                     
     def terrain_gen(self):
         # Generate terrain
@@ -801,16 +800,22 @@ class CannonGame(Widget):
             for y in range(self.heights[x]):
                 ground = Ground()
                 if y == self.heights[x] - 1:
-                    ground_color = Color(0.93, 0.79, 0.69)  # light sand color
+                    #ground_color = Color(0.93, 0.79, 0.69)  # light sand color
+                    ground_color = Color(0.05, 0.05, 0.05)  # light concrete color
                 elif y == self.heights[x] - 2:
-                    ground_color = Color(0.91, 0.76, 0.65)  # slightly darker sand color
+                    ground_color = Color(0.1, 0.1, 0.1)  # light concrete color
+                    #ground_color = Color(0.91, 0.76, 0.65)  # slightly darker sand color
                 elif y == self.heights[x] - 3:
-                    ground_color = Color(0.89, 0.69, 0.53)  # darker sand color
+                    ground_color = Color(0.15, 0.15, 0.15)  # even darker concrete color
+                    #ground_color = Color(0.89, 0.69, 0.53)  # darker sand color
                 elif y < 1:
-                    ground_color = Color(0.55, 0.47, 0.37)  # rocky/bulletproof ground
+                    #ground_color = Color(0.55, 0.47, 0.37)  # rocky/bulletproof ground
+                    ground_color = Color(0.1, 0.1, 0.1)  # even darker concrete color
                     ground.bulletproof = True
                 else:
-                    ground_color = Color(0.82, 0.71, 0.55)  # base desert color
+                    #ground_color = Color(0.82, 0.71, 0.55)  # base desert color
+                    ground_color = Color(0.2, 0.2, 0.2)     
+
 
                 ground.canvas.add(ground_color)
                 ground_pos_y = (y * self.cell_size)
@@ -840,7 +845,7 @@ class CannonGame(Widget):
                     h = self.heights[x] + random.randint(3, 5)
                     for i in range(10):
                         obstacle = Ground()
-                        obstacle_color = Color(0, 0 ,1, 0.6)  # dark brown for obstacles
+                        obstacle_color = Color(0, 0.2 ,0.8, 0.4)  # dark brown for obstacles
                         obstacle.canvas.add(obstacle_color)
                         obstacle_pos_y = (h * self.cell_size + i * self.cell_size)
                         obstacle_rectangle = Rectangle(
@@ -858,7 +863,7 @@ class CannonGame(Widget):
 
             x += 1
 
-        obstacle = Obstacle(cell_size=self.cell_size, gravity=False, wormhole=True,
+        obstacle = Obstacle(cell_size=self.cell_size, gravity=True, wormhole=True,
                             wormhole_exit=(((self.grid_size_x / 2) - 10) * self.cell_size, ((self.grid_size_y / 2) + 10) * self.cell_size),
                             pos=(((self.grid_size_x / 2) + 10) * self.cell_size, ((self.grid_size_y / 2) + 10) * self.cell_size))  # Position the obstacle in the middle of the screen
         self.obstacle_group.add(obstacle)  # Add obstacle to the group
@@ -936,11 +941,11 @@ class CannonGame(Widget):
         self.obstacle_group.clear()
         
         # Generate new parameters for the new map
-        self.chunk_number = random.randint(60, 100)
+        self.chunk_number = random.randint(40, 70)
         self.chunks.clear()
 
-        amplitude = random.randint(3, 11)
-        frequency = random.randint(1, 5)
+        amplitude = random.randint(3, 6)
+        frequency = random.randint(1, 3)
         offset_y = amplitude + 10
         offset_x = random.randint(0, int(self.grid_size_x/frequency))
         
