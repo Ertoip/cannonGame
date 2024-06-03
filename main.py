@@ -782,90 +782,88 @@ class CannonGame(Widget):
     def draw_background(self):
         # Draw the blue sky background
         with self.canvas.before:
-            Color(0.529, 0.808, 0.922)  # Light blue sky color
-            Rectangle(pos=(0, 0), size=(Window.width, Window.height))   
+            Rectangle(source="./trincea.png", spos=(0, 0), size=(Window.width, Window.height))   
                     
     def terrain_gen(self):
         # Generate terrain
-        
+
         x_offset = (self.width - self.grid_size_x * self.cell_size) / 2
 
         x = 0
         chunk = 0
-        
+
         # Create a group for ground objects
         while x < len(self.heights):
-            if (x +1)%self.chunk_size == 0:
-                
+            if (x + 1) % self.chunk_size == 0:
                 chunk += 1
-                c = 0                
+                c = 0
 
             for y in range(self.heights[x]):
                 ground = Ground()
-                if y == self.heights[x]-1:
-                    ground_color = Color(0.1, 1, 0.1) # set color
-                elif y == self.heights[x]-2:
-                    ground_color = Color(0.1, 0.9, 0.1) # set color
-                elif y == self.heights[x]-3:
-                    ground_color = Color(0, 0.8, 0) # set color
-                    
+                if y == self.heights[x] - 1:
+                    ground_color = Color(0.93, 0.79, 0.69)  # light sand color
+                elif y == self.heights[x] - 2:
+                    ground_color = Color(0.91, 0.76, 0.65)  # slightly darker sand color
+                elif y == self.heights[x] - 3:
+                    ground_color = Color(0.89, 0.69, 0.53)  # darker sand color
                 elif y < 1:
-                    ground_color = Color(0.3, 0.3, 0.3)  
+                    ground_color = Color(0.55, 0.47, 0.37)  # rocky/bulletproof ground
                     ground.bulletproof = True
                 else:
-                    ground_color = Color(0.6, 0.3, 0)
-                    
+                    ground_color = Color(0.82, 0.71, 0.55)  # base desert color
+
                 ground.canvas.add(ground_color)
-                ground_pos_y = (y * self.cell_size) 
-                ground_rectangle = Rectangle(pos=((x * self.cell_size)+x_offset, ground_pos_y), size=(self.cell_size, self.cell_size))
+                ground_pos_y = (y * self.cell_size)
+                ground_rectangle = Rectangle(
+                    pos=((x * self.cell_size) + x_offset, ground_pos_y), size=(self.cell_size, self.cell_size))
                 ground.canvas.add(ground_rectangle)
                 ground.size_hint = (None, None)
                 ground.size = (self.cell_size, self.cell_size)
-                ground.pos=((x * self.cell_size)+x_offset, ground_pos_y)
-                
+                ground.pos = ((x * self.cell_size) + x_offset, ground_pos_y)
+
                 self.chunks[chunk]["ground"].append(ground)
                 self.ground_tiles.add(ground)  # Add ground to the group
                 self.add_widget(ground)
             x += 1
-        
+
         x = 0
         chunk = 0
 
         while x < len(self.heights):
-            if (x +1)%self.chunk_size == 0:    
+            if (x + 1) % self.chunk_size == 0:
                 chunk += 1
-                c = 0                
+                c = 0
 
-            if x%4 == 0 and x != 0:
-                rand = random.randint(0,10)
+            if x % 4 == 0 and x != 0:
+                rand = random.randint(0, 10)
                 if rand < 3:
                     h = self.heights[x] + random.randint(3, 5)
                     for i in range(10):
                         obstacle = Ground()
-                        obstacle_color = Color(0,0,1)
+                        obstacle_color = Color(0, 0 ,1, 0.6)  # dark brown for obstacles
                         obstacle.canvas.add(obstacle_color)
                         obstacle_pos_y = (h * self.cell_size + i * self.cell_size)
-                        obstacle_rectangle = Rectangle(pos=((x * self.cell_size)+x_offset, obstacle_pos_y), size=(self.cell_size, self.cell_size))
+                        obstacle_rectangle = Rectangle(
+                            pos=((x * self.cell_size) + x_offset, obstacle_pos_y), size=(self.cell_size, self.cell_size))
                         obstacle.canvas.add(obstacle_rectangle)
                         obstacle.size = (self.cell_size, self.cell_size)
-                        obstacle.pos=((x * self.cell_size)+x_offset, obstacle_pos_y)
-                        
+                        obstacle.pos = ((x * self.cell_size) + x_offset, obstacle_pos_y)
+
                         obstacle.elastic = True
                         obstacle.reflective = True
-                        
+
                         self.chunks[chunk]["ground"].append(obstacle)
                         self.ground_tiles.add(obstacle)  # Add ground to the group
                         self.add_widget(obstacle)
-                
 
             x += 1
 
-        
-        obstacle = Obstacle(cell_size=self.cell_size, gravity=False, wormhole=True, wormhole_exit=(((self.grid_size_x/2)-10)*self.cell_size, ((self.grid_size_y / 2)+10)*self.cell_size), pos=(((self.grid_size_x/2)+10)*self.cell_size, ((self.grid_size_y / 2)+10)*self.cell_size))  # Position the obstacle in the middle of the screen
-        self.obstacle_group.add(obstacle) # Add obstacle to the group
+        obstacle = Obstacle(cell_size=self.cell_size, gravity=False, wormhole=True,
+                            wormhole_exit=(((self.grid_size_x / 2) - 10) * self.cell_size, ((self.grid_size_y / 2) + 10) * self.cell_size),
+                            pos=(((self.grid_size_x / 2) + 10) * self.cell_size, ((self.grid_size_y / 2) + 10) * self.cell_size))  # Position the obstacle in the middle of the screen
+        self.obstacle_group.add(obstacle)  # Add obstacle to the group
         self.add_widget(obstacle)
-        
-        
+
     def create_tank(self, new_pos = None):
         weapon = self.weapons[self.current_weapon]
 
