@@ -1,0 +1,45 @@
+#:kivy 2.3.0
+
+<HelpWindow>:
+    resizable: True
+    BoxLayout:
+        id: help_box
+        orientation: 'vertical'
+        canvas.before:
+            Rectangle:
+                pos: self.pos
+                size: self.size
+                source: "./help.png"
+        AnchorLayout:
+            anchor_x: 'center'
+            anchor_y: 'center'
+            BoxLayout:
+                size_hint: None, None
+                size: 950, 800
+                orientation: 'vertical'
+                padding: [200, 175, 200, 175]
+                canvas.before:
+                    Rectangle:
+                        pos: self.pos
+                        size: self.size
+                        source: "./help widget.png"
+                Button: 
+                    id: save
+                    size_hint: None, None
+                    size: 413, 165
+                    pos_hint: {"center_x": 0.5, "center_y": 0.5}
+                    background_normal: "./save.png"
+                    background_down: "./save down.png"
+                    on_release: app.switch_to_save()
+                Button: 
+                    id: menu
+                    size_hint: None, None
+                    size: 413, 165
+                    pos_hint: {"center_x": 0.5, "center_y": 0.5}
+                    background_normal: "./menu button.png"
+                    background_down: "C:\\Users\\inesr_d9pg\\OneDrive\\Desktop\\Programming\\cannon game\\menu button down.png"
+                    on_release: app.switch_to_menu()
+
+
+<HelpScreen>:
+    HelpWindow:

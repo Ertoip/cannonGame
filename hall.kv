@@ -1,0 +1,96 @@
+<HallWindow>:
+    resizable: True
+    FloatLayout:
+        canvas.before:
+            Rectangle:
+                pos: self.pos
+                size: self.size
+                source: "./neutra.png"
+                
+        Button:
+            size_hint: None, None
+            size: 125, 50
+            pos_hint: {'right': 1, 'top': 1}
+            background_normal: "./back.png"
+            background_down: "./exit down.png"
+            on_release: app.switch_to_menu()
+        
+        FloatLayout:
+            size_hint: None, None
+            size: 750, 1063
+            pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+            canvas.before:
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+                    source: "./hall of fame widget.png"
+
+            BoxLayout:
+                id: score_1
+                size_hint: None, None
+                size: 608, 90
+                pos_hint: {"center_x": 0.5, "top": 0.8}
+                canvas.before:
+                    Rectangle:
+                        pos: self.pos
+                        size: self.size
+                        source: "./score 1.png"
+
+            BoxLayout:
+                id: score_2
+                size_hint: None, None
+                size: 608, 90
+                pos_hint: {"center_x": 0.5, "top": 0.675}
+                canvas.before:
+                    Rectangle:
+                        pos: self.pos
+                        size: self.size
+                        source: "./score 2.png"
+
+            BoxLayout:
+                id: score_3
+                size_hint: None, None
+                size: 608, 90
+                pos_hint: {"center_x": 0.5, "top": 0.55}
+                canvas.before:
+                    Rectangle:
+                        pos: self.pos
+                        size: self.size
+                        source: "./score 3.png"
+
+            BoxLayout:
+                id: score_4
+                size_hint: None, None
+                size: 608, 90
+                pos_hint: {"center_x": 0.5, "top": 0.425}
+                canvas.before:
+                    Rectangle:
+                        pos: self.pos
+                        size: self.size
+                        source: "./score 4.png"
+
+            BoxLayout:
+                id: score_5
+                size_hint: None, None
+                size: 608, 90
+                pos_hint: {"center_x": 0.5, "top": 0.3}
+                canvas.before:
+                    Rectangle:
+                        pos: self.pos
+                        size: self.size
+                        source: "./score 5.png"
+
+            BoxLayout:
+                id: score_6
+                size_hint: None, None
+                size: 608, 90
+                pos_hint: {"center_x": 0.5, "top": 0.175}
+                canvas.before:
+                    Rectangle:
+                        pos: self.pos
+                        size: self.size
+                        source: "./score 6.png"
+
+
+<HallScreen>:
+    HallWindow:
