@@ -1,0 +1,67 @@
+#:kivy 2.3.0
+
+<SaveWindow>:
+    resizable: True
+    BoxLayout:
+        id: save_box
+        orientation: "vertical"
+        canvas.before:
+            Rectangle:
+                pos: self.pos
+                size: self.size
+                source: "./neutra.png"
+        FloatLayout:
+            id: back
+            size_hint_y: 1
+            Button:
+                size_hint: None, None
+                size: 125, 50
+                pos_hint: {'right': 1, 'top': 1} 
+                background_normal: "./back.png"
+                background_down: "./exit down.png"
+                on_release: app.switch_to_menu()
+        BoxLayout:
+            size_hint: None, None
+            size: 1300, 1013
+            pos_hint: {"center_x": 0.5, "center_y": 0.5}
+            padding: [50, 0, 50, 30]
+            FloatLayout:
+                canvas.before:
+                    Rectangle:
+                        pos: self.pos
+                        size: self.size
+                        source: "./save widget.png"
+                BoxLayout:
+                    id: file_1
+                    size_hint: None, None
+                    size: 788, 315
+                    pos_hint: {"center_x": 0.5, "top": 0.95}
+                    canvas.before:
+                        Rectangle:
+                            pos: self.pos
+                            size: self.size
+                            source: "./save_1.png"
+                BoxLayout:
+                    id: file_2
+                    size_hint: None, None
+                    size: 788, 315
+                    pos_hint: {"center_x": 0.5, "top": 0.65}
+                    canvas.before:
+                        Rectangle:
+                            pos: self.pos
+                            size: self.size
+                            source: "./save_2.png"
+                BoxLayout:
+                    id: file_3
+                    size_hint: None, None
+                    size: 788, 315
+                    pos_hint: {"center_x": 0.5, "top": 0.35}
+                    canvas.before:
+                        Rectangle:
+                            pos: self.pos
+                            size: self.size
+                            source: "./save_3.png"
+
+
+<SaveScreen>:
+    SaveWindow:

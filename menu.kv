@@ -1,0 +1,55 @@
+#:kivy 2.3.0
+
+<MenuWindow>:
+    resizable: True
+    BoxLayout:
+        id: main_box
+        orientation: "vertical"
+        canvas.before:
+            Rectangle:
+                pos: self.pos
+                size: self.size
+                source: "./neutra.png"
+        FloatLayout:
+            id: exit game
+            size_hint_y: 1
+            Button:
+                size_hint: None, None
+                size: 125, 50
+                pos_hint: {'right': 1, 'top': 1} 
+                background_normal: "./exit.png"
+                background_down: "./exit down.png"
+                on_release: app.close_app()
+        BoxLayout: 
+            id: buttons 
+            padding: [200, 300, 200, 300]
+            spacing: 25
+            orientation: "vertical"
+            Button:
+                id: new game
+                size_hint: None, None
+                size: 300, 120
+                pos_hint: {"center_x": 0.5, "center_y": 0.5}
+                background_normal: "./new game.png"
+                background_down: "./new game down.png"
+                on_release: app.switch_to_help()
+            Button:
+                id: load game
+                size_hint: None, None
+                size: 300, 120
+                pos_hint: {"center_x": 0.5, "center_y": 0.5}
+                background_normal: "./load game.png"
+                background_down: "./load game down.png"
+                on_release: app.switch_to_save()
+            Button:
+                id: hall of fame
+                size_hint: None, None
+                size: 300, 120
+                pos_hint: {"center_x": 0.5, "center_y": 0.5}
+                background_normal: "./hall of fame.png"
+                background_down: "./hall of fame down.png"
+                on_release: app.switch_to_hall()
+                
+<MenuScreen>:
+    MenuWindow:     
+    

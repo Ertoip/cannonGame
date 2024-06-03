@@ -1,0 +1,30 @@
+#:kivy 2.3.0
+
+<OpenWindow>:
+    resizable: True
+    BoxLayout:
+        id: open_box
+        orientation: "vertical"
+        padding: [200, 300, 200, 300]
+        spacing: 25
+        canvas.before:
+            Rectangle:
+                pos: self.pos
+                size: self.size
+                source: "./neutra.png"
+        Image:
+            source: "./name widget.png"
+            pos_hint: {"center_x": 0.5, "center_y": 0.5}
+            size_hint: None, None
+            size: 900, 360  
+        Button:
+            id: play
+            pos_hint: {"center_x": 0.5, "center_y": 0.5}
+            size_hint: None, None
+            size: 300, 120
+            background_normal: "./play button.png"
+            background_down: "./play down.png"
+            on_release: app.switch_to_menu()
+
+<OpenScreen>:
+    OpenWindow:
