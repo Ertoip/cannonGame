@@ -7,6 +7,9 @@ from kivy.graphics import Rectangle, Color, Rotate, Line, Ellipse
 from kivy.uix.button import Button
 from kivy.core.window import Window, Keyboard
 from kivy.config import Config
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.screenmanager import ScreenManager, Screen
+from kivy.lang import Builder
 import math
 import random
 import time
@@ -47,8 +50,8 @@ class Obstacle(Widget):
 
             if self.gravity:
                 # Draw the effect radius ring around the obstacle
-                Color(1, 0, 0, 0.5)  # Red color with 50% opacity
-                self.effect_radius_ring = Line(circle=(self.center_x, self.center_y, self.effectRadius * self.cell_size), width=1.1)
+                Color(0, 0, 0, 0.5)  # Red color with 50% opacity
+                self.effect_radius_ring = Line(circle=(self.center_x, self.center_y, self.effectRadius * self.cell_size), width=2)
 
             if self.wormhole:
                 # Draw the wormhole exit
@@ -57,8 +60,8 @@ class Obstacle(Widget):
                                                     size=(self.radius * 2 * self.cell_size, self.radius * 2 * self.cell_size))
                 if self.gravity:
                     # Draw the effect radius ring around the wormhole exit
-                    Color(1, 0, 0, 0.5)  # Red color with 50% opacity
-                    self.effect_radius_exit_ring = Line(circle=(self.wormhole_exit[0], self.wormhole_exit[1], self.effectRadius * self.cell_size), width=1.1)
+                    Color(0, 0, 0, 0.5)  # Red color with 50% opacity
+                    self.effect_radius_exit_ring = Line(circle=(self.wormhole_exit[0], self.wormhole_exit[1], self.effectRadius * self.cell_size), width=2)
 
         self.bind(pos=self.update_obstacle_position, size=self.update_obstacle_position)
 
@@ -147,7 +150,7 @@ class Enemy(Widget):
         super().__init__(**kwargs)
         with self.canvas:
             # Draw the tank body (rectangle)
-            Color(0.1, 0.1, 0.1)
+            Color(0.1, 0.8, 0.1)
             self.rect = Rectangle(pos=self.pos, size=self.size)
             
             # Draw the cannon
@@ -372,6 +375,7 @@ class Tank(Widget):
             self.max_ammo = max_ammo
             self.reload_time = reload_time
             
+            Color(0.0, 0.05, 0.0)
             # Draw the cannon
             self.cannon_length = self.size[1] * 0.3  # Adjust the length of the cannon as needed
             self.cannon_width = self.size[0] * 0.02  # Adjust the width of the cannon as needed
@@ -658,7 +662,7 @@ class CannonGame(Widget):
     fullscreen = BooleanProperty(True)
     
     chunk_size = NumericProperty(2)
-    chunk_number = NumericProperty(random.randint(50, 50))
+    chunk_number = NumericProperty(random.randint(50, 75))
     chunks = ListProperty([])
 
     level = NumericProperty(1)
@@ -781,7 +785,14 @@ class CannonGame(Widget):
     def draw_background(self):
         # Draw the blue sky background
         with self.canvas.before:
-            Rectangle(source="./città.png", spos=(0, 0), size=(Window.width, Window.height))   
+            current_stage = (self.level // 5) % 5
+            if current_stage == 0:
+                Rectangle(source="./trincea.png", spos=(0, 0), size=(Window.width, Window.height))   
+            elif current_stage == 1:
+                Rectangle(source="./città.png", spos=(0, 0), size=(Window.width, Window.height))   
+            elif current_stage == 2:
+                Rectangle(source="./luna.png", spos=(0, 0), size=(Window.width, Window.height))   
+
                     
     def terrain_gen(self):
         # Generate terrain
@@ -799,22 +810,48 @@ class CannonGame(Widget):
 
             for y in range(self.heights[x]):
                 ground = Ground()
+                current_stage = (self.level // 5) % 5
+                
                 if y == self.heights[x] - 1:
-                    #ground_color = Color(0.93, 0.79, 0.69)  # light sand color
-                    ground_color = Color(0.05, 0.05, 0.05)  # light concrete color
+                    if current_stage == 0:
+                        ground_color = Color(0.93, 0.79, 0.69)  # light sand color
+                    elif current_stage == 1:
+                        ground_color = Color(0.05, 0.05, 0.05)  # light concrete color
+                    elif current_stage == 2:
+                        ground_color = Color(0.6, 0.6, 0.6)  # light moon color
+                
                 elif y == self.heights[x] - 2:
-                    ground_color = Color(0.1, 0.1, 0.1)  # light concrete color
-                    #ground_color = Color(0.91, 0.76, 0.65)  # slightly darker sand color
+                    if current_stage == 0:
+                        ground_color = Color(0.91, 0.76, 0.65)  # slightly darker sand color
+                    elif current_stage == 1:
+                        ground_color = Color(0.1, 0.1, 0.1)  # light concrete color
+                    elif current_stage == 2:
+                        ground_color = Color(0.55, 0.55, 0.55)  # light moon color
+                
                 elif y == self.heights[x] - 3:
-                    ground_color = Color(0.15, 0.15, 0.15)  # even darker concrete color
-                    #ground_color = Color(0.89, 0.69, 0.53)  # darker sand color
+                    if current_stage == 0:
+                        ground_color = Color(0.89, 0.69, 0.53)  # darker sand color
+                    elif current_stage == 1:
+                        ground_color = Color(0.15, 0.15, 0.15)  # even darker concrete color
+                    elif current_stage == 2:
+                        ground_color = Color(0.5, 0.5, 0.5)  # light moon color
+                
                 elif y < 1:
-                    #ground_color = Color(0.55, 0.47, 0.37)  # rocky/bulletproof ground
-                    ground_color = Color(0.1, 0.1, 0.1)  # even darker concrete color
                     ground.bulletproof = True
+                    if current_stage == 0:
+                        ground_color = Color(0.55, 0.47, 0.37)  # rocky ground
+                    elif current_stage == 1:
+                        ground_color = Color(0.1, 0.1, 0.1)  # even darker concrete color
+                    elif current_stage == 2:
+                        ground_color = Color(0.1, 0.1, 0.1)  # light moon color
+                
                 else:
-                    #ground_color = Color(0.82, 0.71, 0.55)  # base desert color
-                    ground_color = Color(0.2, 0.2, 0.2)     
+                    if current_stage == 0:
+                        ground_color = Color(0.82, 0.71, 0.55)  # base desert color
+                    elif current_stage == 1:
+                        ground_color = Color(0.2, 0.2, 0.2)  # base street color
+                    elif current_stage == 2:
+                        ground_color = Color(0.4, 0.4, 0.4)  # light moon color                    
 
 
                 ground.canvas.add(ground_color)
@@ -842,7 +879,7 @@ class CannonGame(Widget):
             if x % 4 == 0 and x != 0:
                 rand = random.randint(0, 10)
                 if rand < 3:
-                    h = self.heights[x] + random.randint(3, 5)
+                    h = self.heights[x] + random.randint(5, 7)
                     for i in range(10):
                         obstacle = Ground()
                         obstacle_color = Color(0, 0.2 ,0.8, 0.4)  # dark brown for obstacles
@@ -920,7 +957,7 @@ class CannonGame(Widget):
         self.enemy_weapon["effect_diameter"] = random.randint(1, 3) * level_multiplier
         self.enemy_weapon["firerate"] = random.uniform(0.1, 0.5) * level_multiplier
         self.enemy_weapon["reload_speed"] = random.uniform(1, 3) * level_multiplier
-        self.enemy_weapon["ammo_number"] = random.randint(20, 50) * level_multiplier
+        self.enemy_weapon["ammo_number"] = random.randint(1, 3) * level_multiplier
         self.enemy_weapon["radius"] = random.uniform(0.3, 0.8) * level_multiplier
         self.enemy_weapon["drill"] = random.randint(0, 2) * level_multiplier
         self.enemy_weapon["repeat_explosions"] = random.choice([True, False])
@@ -941,7 +978,7 @@ class CannonGame(Widget):
         self.obstacle_group.clear()
         
         # Generate new parameters for the new map
-        self.chunk_number = random.randint(40, 70)
+        self.chunk_number = random.randint(50, 75)
         self.chunks.clear()
 
         amplitude = random.randint(3, 6)
@@ -1637,6 +1674,81 @@ class CannonApp(App):
         Clock.schedule_interval(game.update, fps)
         return game
 
+class OpenWindow(BoxLayout):
+    pass
+
+class MenuWindow(BoxLayout):
+    pass
+
+class HelpWindow(BoxLayout):
+    pass
+
+class SaveWindow(BoxLayout):
+    pass
+
+class HallWindow(BoxLayout):
+    pass
+
+class OpenScreen(Screen):
+    pass
+
+class MenuScreen(Screen):
+    pass
+
+class HelpScreen(Screen):
+    pass
+
+class SaveScreen(Screen):
+    pass
+
+class HallScreen(Screen):
+    pass
+
+class GameScreen(Screen):
+    pass
+
+class InterfaceApp(App):
+    def build(self):
+        Builder.load_file('open.kv')
+        Builder.load_file('menu.kv')
+        Builder.load_file('help.kv')
+        Builder.load_file('save.kv')
+        Builder.load_file('hall.kv')
+        self.sm = ScreenManager()
+        self.sm.add_widget(OpenScreen(name='open'))
+        self.sm.add_widget(MenuScreen(name='menu'))
+        self.sm.add_widget(HelpScreen(name='help'))
+        self.sm.add_widget(SaveScreen(name='save'))
+        self.sm.add_widget(HallScreen(name='hall'))
+        self.sm.add_widget(GameScreen(name='game'))
+        Window.fullscreen = 'auto'
+        return self.sm
+    
+    
+    def switch_to_menu(self):
+        self.sm.current = 'menu'
+
+    def switch_to_help(self):
+        self.sm.current = 'help'
+
+    def switch_to_save(self):
+        self.sm.current = 'save'
+
+    def switch_to_hall(self):
+        self.sm.current = 'hall'
+
+    def start_new_game(self):
+        self.sm.current = 'game'
+        game_screen = self.sm.get_screen('game')
+        game_screen.clear_widgets()
+        game = CannonGame()
+        game_screen.add_widget(game)
+        fps = 1 / game.fps if game.fps != 0 else 0
+        Clock.schedule_interval(game.update, fps)
+
+    def close_app(self):
+        self.stop()
 
 if __name__ == '__main__':
-    CannonApp().run()
+    sample_app = InterfaceApp()
+    sample_app.run()

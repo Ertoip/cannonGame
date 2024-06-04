@@ -32,7 +32,7 @@
                 pos_hint: {"center_x": 0.5, "center_y": 0.5}
                 background_normal: "./new game.png"
                 background_down: "./new game down.png"
-                on_release: app.switch_to_help()
+                on_release: app.start_new_game()
             Button:
                 id: load game
                 size_hint: None, None
@@ -49,7 +49,15 @@
                 background_normal: "./hall of fame.png"
                 background_down: "./hall of fame down.png"
                 on_release: app.switch_to_hall()
-                
+            Button:
+                id: help
+                size_hint: None, None
+                size: 300, 120
+                pos_hint: {"center_x": 0.5, "center_y": 0.5}
+                background_normal: "./new game.png"
+                background_down: "./new game down.png"
+                on_release: app.switch_to_help()
+
 <MenuScreen>:
     MenuWindow:     
     
