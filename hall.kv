@@ -1,5 +1,4 @@
 <HallWindow>:
-    resizable: True
     FloatLayout:
         canvas.before:
             Rectangle:
@@ -35,6 +34,9 @@
                         pos: self.pos
                         size: self.size
                         source: "./score 1.png"
+                Label:
+                    id: score_1_label
+                    text: ""
 
             BoxLayout:
                 id: score_2
@@ -46,6 +48,9 @@
                         pos: self.pos
                         size: self.size
                         source: "./score 2.png"
+                Label:
+                    id: score_2_label
+                    text: ""
 
             BoxLayout:
                 id: score_3
@@ -57,6 +62,9 @@
                         pos: self.pos
                         size: self.size
                         source: "./score 3.png"
+                Label:
+                    id: score_3_label
+                    text: ""
 
             BoxLayout:
                 id: score_4
@@ -68,6 +76,9 @@
                         pos: self.pos
                         size: self.size
                         source: "./score 4.png"
+                Label:
+                    id: score_4_label
+                    text: ""
 
             BoxLayout:
                 id: score_5
@@ -79,6 +90,9 @@
                         pos: self.pos
                         size: self.size
                         source: "./score 5.png"
+                Label:
+                    id: score_5_label
+                    text: ""
 
             BoxLayout:
                 id: score_6
@@ -90,7 +104,6 @@
                         pos: self.pos
                         size: self.size
                         source: "./score 6.png"
-
-
-<HallScreen>:
-    HallWindow:
+                Label:
+                    id: score_6_label
+                    text: ""

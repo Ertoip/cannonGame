@@ -1,0 +1,30 @@
+<GameOverScreen>:
+    BoxLayout:
+        orientation: 'vertical'
+        canvas.before:
+            Rectangle:
+                pos: self.pos
+                size: self.size
+                source: "./neutra.png"
+        Label:
+            id: game_over_label
+            text: 'Game Over'
+            font_size: 40
+        Label:
+            id: level_label
+            text: 'Level Reached: 0'
+            font_size: 30
+        Label:
+            id: shots_label
+            text: 'Total Shots Fired: 0'
+            font_size: 30
+        Button:
+            text: 'Return to Menu'
+            size_hint_y: None
+            height: '48dp'
+            on_release: app.switch_to_menu()
+        Button:
+            text: 'Exit'
+            size_hint_y: None
+            height: '48dp'
+            on_release: app.close_app()

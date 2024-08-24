@@ -14,6 +14,10 @@ import math
 import random
 import time
 import threading
+import json
+from kivy.uix.floatlayout import FloatLayout
+from kivy.uix.label import Label
+import os
 
 class Ground(Widget):
     reflective = BooleanProperty(False)
@@ -35,32 +39,39 @@ class Obstacle(Widget):
     repulsive = BooleanProperty(False)
     wormhole_exit = ListProperty([])
 
-    def __init__(self, cell_size, gravity=False, wormhole=False, wormhole_exit=[0, 0], color=(0, 0, 0), **kwargs):
+    def __init__(self, cell_size, gravity=False, wormhole=False, wormhole_exit=[0, 0], color=(0, 0, 0), repulsive=False, effectRadius=0, **kwargs):
         super().__init__(**kwargs)
         self.cell_size = cell_size
         self.gravity = gravity
         self.wormhole = wormhole
         self.wormhole_exit = wormhole_exit
+        self.repulsive = repulsive
+        self.effectRadius = effectRadius
 
         with self.canvas:
+            if self.repulsive:
+                circle_color = (1, 1, 1)
+            else:
+                circle_color = (0, 0, 0)
+
             # Draw the obstacle (circle)
-            Color(color[0], color[0], color[0])
+            Color(*circle_color)
             self.obstacle = Ellipse(pos=(self.center_x - self.radius * self.cell_size, self.center_y - self.radius * self.cell_size), 
                                     size=(self.radius * 2 * self.cell_size, self.radius * 2 * self.cell_size))
 
-            if self.gravity:
+            if self.gravity or self.wormhole:
                 # Draw the effect radius ring around the obstacle
-                Color(0, 0, 0, 0.5)  # Red color with 50% opacity
+                Color(1, 1, 1) if self.repulsive else Color(0, 0, 0)  # White for repulsive, black for not repulsive
                 self.effect_radius_ring = Line(circle=(self.center_x, self.center_y, self.effectRadius * self.cell_size), width=2)
 
             if self.wormhole:
                 # Draw the wormhole exit
-                Color(color[0], color[0], color[0])
+                Color(*circle_color)
                 self.wormhole_exit_circle = Ellipse(pos=(self.wormhole_exit[0] - self.radius * self.cell_size, self.wormhole_exit[1] - self.radius * self.cell_size), 
                                                     size=(self.radius * 2 * self.cell_size, self.radius * 2 * self.cell_size))
                 if self.gravity:
                     # Draw the effect radius ring around the wormhole exit
-                    Color(0, 0, 0, 0.5)  # Red color with 50% opacity
+                    Color(1, 1, 1) if self.repulsive else Color(0, 0, 0)  # White for repulsive, black for not repulsive
                     self.effect_radius_exit_ring = Line(circle=(self.wormhole_exit[0], self.wormhole_exit[1], self.effectRadius * self.cell_size), width=2)
 
         self.bind(pos=self.update_obstacle_position, size=self.update_obstacle_position)
@@ -123,9 +134,7 @@ class Obstacle(Widget):
         if distance_exit < self.radius * 2 * self.cell_size / 2:
             bullet.x = self.center_x + self.obstacle.size[0] / 2
             bullet.y = self.center_y + self.obstacle.size[1] / 2
-
-
-
+                        
 #-------------------------------------------------------------------------enemy target-------------------------------------------------------------------------#
 class Enemy(Widget):
     cannon_angle = NumericProperty(math.pi)
@@ -231,7 +240,6 @@ class Enemy(Widget):
         self.health_bar.points = (self.x + self.width +self.width * 0.3 - self.health_bar_lenght, self.top + self.height * 0.3,
                                  self.x + self.width * 1.3 , self.top + self.height * 0.3)
 
-
     def shoot(self, game):
         weapon = game.enemy_weapon
 
@@ -251,7 +259,7 @@ class Enemy(Widget):
             bullet.repeat_explosions = weapon.get("repeat_explosions", None)
             bullet.laser = weapon.get("laser", None)
             
-            game.bullet_group.add(bullet)
+            game.bullets.add(bullet)
             game.add_widget(bullet)
             
             self.last_shot_time = time.time()
@@ -266,7 +274,6 @@ class Enemy(Widget):
                 self.reload_weapon()
             
             self.last_timepoint = time.time()
-
 
     def enemy_ai(self, game, start_x, start_y, target_x, target_y, speed, g):
         x = target_x - start_x
@@ -360,6 +367,8 @@ class Tank(Widget):
 
     is_shooting = BooleanProperty(False)
     shoot_start_time = NumericProperty(0)
+    
+    total_shots = NumericProperty(0)
         
     def __init__(self, health = 50, ammo=10, max_ammo = 10, reload_time = 10, **kwargs):
         super().__init__(**kwargs)
@@ -476,10 +485,11 @@ class Tank(Widget):
             bullet.repeat_explosions = weapon.get("repeat_explosions", None)
             bullet.laser = weapon.get("laser", None)
             
-            game.bullet_group.add(bullet)
+            game.bullets.add(bullet)
             game.add_widget(bullet)
             
             self.ammo -= 1
+            self.total_shots += 1  # Increment the total shots counter
             
             self.reload_bar_lenght = self.width * 1.6 * self.ammo / self.max_ammo
             self.reload_bar.points = (
@@ -492,8 +502,7 @@ class Tank(Widget):
             
             self.last_timepoint = time.time()
             self.shoot_start_time = 0
-
-
+            
     def calculate_shoot_speed_multiplier(self):
         hold_duration = time.time() - self.shoot_start_time
         return min(1, hold_duration*0.5)  # Cap the speed multiplier at 2x
@@ -536,12 +545,33 @@ class Tank(Widget):
                     dot = Ellipse(pos=(dot_x - radius, dot_y - radius), size=(self.dot_size * game.cell_size, self.dot_size * game.cell_size))
                     self.bullet_preds.append(dot)
                     
-    def hit(self, damage = 1):
+    def hit(self, game, damage=1):
         self.health -= damage
         self.update_health_bar()
         if self.health < 1:
-            App.get_running_app().stop() 
+            self.save_score(game.level)
+            App.get_running_app().root.current = 'game_over'
+            game_over_screen = App.get_running_app().root.get_screen('game_over')
+            game_over_screen.ids.shots_label.text = f'Total Shots Fired: {self.total_shots}'
+            game_over_screen.ids.level_label.text = f'Level Reached: {game.level}'
+            
+    def save_score(self, level):
+        score_data = {
+            "level": level,
+            "total_shots": self.total_shots
+        }
 
+        try:
+            with open('scores.json', 'r') as file:
+                scores = json.load(file)
+        except FileNotFoundError:
+            scores = []
+
+        scores.append(score_data)
+        scores = sorted(scores, key=lambda x: x['level'], reverse=True)[:5]
+
+        with open('scores.json', 'w') as file:
+            json.dump(scores, file)
             
     def reload_weapon(self):
         if not self.reloading:
@@ -613,7 +643,7 @@ class Bullet(Widget):
     def explode(self, game):
         explosion = Explosion(effect_diameter=self.effect_diameter * game.cell_size, pos=self.pos)
         game.add_widget(explosion)
-        game.explosion_group.add(explosion)
+        game.explosions.add(explosion)
         
     def recalculate_angle(self, normal_vector):
         # Calculate the angle of incidence based on the bullet's current velocity
@@ -673,7 +703,7 @@ class CannonGame(Widget):
         self.weapons = [{
             "name": "Bullet",
             "mass": 0.025,
-            "effect_diameter": 7,
+            "effect_diameter": 3,
             "speed": 2,
             "firerate": 2,
             "reload_speed": 1,
@@ -752,9 +782,9 @@ class CannonGame(Widget):
             self.heights.append(round(y))  # Round the result to the nearest integer
         
         self.ground_tiles = set()
-        self.bullet_group = set()
-        self.explosion_group = set()
-        self.obstacle_group = set()
+        self.bullets = set()
+        self.explosions = set()
+        self.obstacles = set()
         
         self.draw_background() # Draw the background
         self.terrain_gen()  # Draw the grid
@@ -780,7 +810,6 @@ class CannonGame(Widget):
         self.bind(on_touch_down = self.onMousePressed)
         self.bind(on_touch_up=self.onMouseReleased)
 
-
 #-------------------------------------------------------------------------map generation-------------------------------------------------------------------------#
     def draw_background(self):
         # Draw the blue sky background
@@ -792,7 +821,6 @@ class CannonGame(Widget):
                 Rectangle(source="./città.png", spos=(0, 0), size=(Window.width, Window.height))   
             elif current_stage == 2:
                 Rectangle(source="./luna.png", spos=(0, 0), size=(Window.width, Window.height))   
-
                     
     def terrain_gen(self):
         # Generate terrain
@@ -801,6 +829,8 @@ class CannonGame(Widget):
 
         x = 0
         chunk = 0
+
+        wormhole_colors = {}
 
         # Create a group for ground objects
         while x < len(self.heights):
@@ -811,7 +841,7 @@ class CannonGame(Widget):
             for y in range(self.heights[x]):
                 ground = Ground()
                 current_stage = (self.level // 5) % 5
-                
+
                 if y == self.heights[x] - 1:
                     if current_stage == 0:
                         ground_color = Color(0.93, 0.79, 0.69)  # light sand color
@@ -819,7 +849,7 @@ class CannonGame(Widget):
                         ground_color = Color(0.05, 0.05, 0.05)  # light concrete color
                     elif current_stage == 2:
                         ground_color = Color(0.6, 0.6, 0.6)  # light moon color
-                
+
                 elif y == self.heights[x] - 2:
                     if current_stage == 0:
                         ground_color = Color(0.91, 0.76, 0.65)  # slightly darker sand color
@@ -827,7 +857,7 @@ class CannonGame(Widget):
                         ground_color = Color(0.1, 0.1, 0.1)  # light concrete color
                     elif current_stage == 2:
                         ground_color = Color(0.55, 0.55, 0.55)  # light moon color
-                
+
                 elif y == self.heights[x] - 3:
                     if current_stage == 0:
                         ground_color = Color(0.89, 0.69, 0.53)  # darker sand color
@@ -835,7 +865,7 @@ class CannonGame(Widget):
                         ground_color = Color(0.15, 0.15, 0.15)  # even darker concrete color
                     elif current_stage == 2:
                         ground_color = Color(0.5, 0.5, 0.5)  # light moon color
-                
+
                 elif y < 1:
                     ground.bulletproof = True
                     if current_stage == 0:
@@ -844,15 +874,14 @@ class CannonGame(Widget):
                         ground_color = Color(0.1, 0.1, 0.1)  # even darker concrete color
                     elif current_stage == 2:
                         ground_color = Color(0.1, 0.1, 0.1)  # light moon color
-                
+
                 else:
                     if current_stage == 0:
                         ground_color = Color(0.82, 0.71, 0.55)  # base desert color
                     elif current_stage == 1:
                         ground_color = Color(0.2, 0.2, 0.2)  # base street color
                     elif current_stage == 2:
-                        ground_color = Color(0.4, 0.4, 0.4)  # light moon color                    
-
+                        ground_color = Color(0.4, 0.4, 0.4)  # light moon color
 
                 ground.canvas.add(ground_color)
                 ground_pos_y = (y * self.cell_size)
@@ -877,12 +906,13 @@ class CannonGame(Widget):
                 c = 0
 
             if x % 4 == 0 and x != 0:
-                rand = random.randint(0, 10)
-                if rand < 3:
+                rand = random.randint(0, max(100-self.level, 20)) 
+                if rand < 10:
+                    # Generate a mirror obstacle
                     h = self.heights[x] + random.randint(5, 7)
                     for i in range(10):
                         obstacle = Ground()
-                        obstacle_color = Color(0, 0.2 ,0.8, 0.4)  # dark brown for obstacles
+                        obstacle_color = Color(0, 0.2, 0.8, 0.4)  # dark brown for obstacles
                         obstacle.canvas.add(obstacle_color)
                         obstacle_pos_y = (h * self.cell_size + i * self.cell_size)
                         obstacle_rectangle = Rectangle(
@@ -898,14 +928,64 @@ class CannonGame(Widget):
                         self.ground_tiles.add(obstacle)  # Add ground to the group
                         self.add_widget(obstacle)
 
+                elif 11 <= rand <= 12:
+                    radius = random.randint(1, 5)
+                    height_above_ground = random.randint(2, 6)
+
+                    # Generate a gravity obstacle
+                    obstacle = Obstacle(
+                        cell_size=self.cell_size,
+                        gravity=True,
+                        pos=((x * self.cell_size), (self.heights[x] + height_above_ground) * self.cell_size),
+                        radius=radius,
+                        effectRadius=radius*3,
+
+                    )
+                    self.obstacles.add(obstacle)
+                    self.add_widget(obstacle)
+
+                elif 13 <= rand <= 14:
+                    # Generate a wormhole obstacle with random height above ground and random radius
+                    height_above_ground = random.randint(5, 10)
+                    radius = random.randint(1, 5)
+                    wormhole_exit_x = random.randint(0, self.grid_size_x) * self.cell_size
+                    wormhole_exit_y = random.randint(0, self.grid_size_y) * self.cell_size
+                    
+                    if (wormhole_exit_x, wormhole_exit_y) not in wormhole_colors:
+                        wormhole_colors[(wormhole_exit_x, wormhole_exit_y)] = (random.random(), random.random(), random.random())
+                    color = wormhole_colors[(wormhole_exit_x, wormhole_exit_y)]
+
+                    obstacle = Obstacle(
+                        cell_size=self.cell_size,
+                        wormhole=True,
+                        gravity=False,
+                        wormhole_exit=(wormhole_exit_x, wormhole_exit_y),
+                        radius=radius,
+                        color=color,
+                        pos=((x * self.cell_size), (self.heights[x] + height_above_ground) * self.cell_size)
+                    )
+                    self.obstacles.add(obstacle)
+                    self.add_widget(obstacle)
+                
+                elif 15 <= rand <= 16:
+                    radius = random.randint(1, 5)
+                    height_above_ground = random.randint(2, 6)
+
+                    # Generate a gravity obstacle
+                    obstacle = Obstacle(
+                        cell_size=self.cell_size,
+                        gravity=True,
+                        pos=((x * self.cell_size), (self.heights[x] + height_above_ground) * self.cell_size),
+                        radius=radius,
+                        effectRadius=radius*3,
+                        repulsive = True
+
+                    )
+                    self.obstacles.add(obstacle)
+                    self.add_widget(obstacle)
+
             x += 1
-
-        obstacle = Obstacle(cell_size=self.cell_size, gravity=True, wormhole=True,
-                            wormhole_exit=(((self.grid_size_x / 2) - 10) * self.cell_size, ((self.grid_size_y / 2) + 10) * self.cell_size),
-                            pos=(((self.grid_size_x / 2) + 10) * self.cell_size, ((self.grid_size_y / 2) + 10) * self.cell_size))  # Position the obstacle in the middle of the screen
-        self.obstacle_group.add(obstacle)  # Add obstacle to the group
-        self.add_widget(obstacle)
-
+                        
     def create_tank(self, new_pos = None):
         weapon = self.weapons[self.current_weapon]
 
@@ -966,16 +1046,90 @@ class CannonGame(Widget):
         # Apply the new stats to the enemy
         self.enemy.ammo = self.enemy_weapon["ammo_number"]
         self.enemy.max_ammo = self.enemy_weapon["ammo_number"]
-        self.enemy.reload_time = self.enemy_weapon["reload_speed"]   
+        self.enemy.reload_time = self.enemy_weapon["reload_speed"]  
+        
+    def store_level_stats(self):
+        level_stats = {
+            "level": self.level,
+            "enemy": {
+                "speed": self.enemy.speed,
+                "mass": self.enemy.mass,
+                "moving": self.enemy.moving,
+                "health": self.enemy.health,
+                "max_health": self.enemy.max_health,
+                "weapon_range": self.enemy.weapon_range,
+                "direct_hitter": self.enemy.direct_hitter,
+                "imprecision": self.enemy.imprecision,
+                "ammo": self.enemy.ammo,
+                "max_ammo": self.enemy.max_ammo,
+                "reload_time": self.enemy.reload_time
+            },
+            "enemy_weapon": self.enemy_weapon,
+            "terrain": {
+                "chunk_number": self.chunk_number,
+                "heights": self.heights,
+                "chunk_size": self.chunk_size
+            }
+        }
+
+        with open('current_level_stats.json', 'w') as file:
+            json.dump(level_stats, file, indent=4)
             
-    def regenerate_map(self):
+    def load_game(self, game_stats):
+        self.level = game_stats['level']
+        self.enemy_weapon = game_stats['enemy_weapon']
+
+        # Set enemy stats
+        self.enemy.speed = game_stats['enemy']['speed']
+        self.enemy.mass = game_stats['enemy']['mass']
+        self.enemy.moving = game_stats['enemy']['moving']
+        self.enemy.health = game_stats['enemy']['health']
+        self.enemy.max_health = game_stats['enemy']['max_health']
+        self.enemy.weapon_range = game_stats['enemy']['weapon_range']
+        self.enemy.direct_hitter = game_stats['enemy']['direct_hitter']
+        self.enemy.imprecision = game_stats['enemy']['imprecision']
+        self.enemy.ammo = game_stats['enemy']['ammo']
+        self.enemy.max_ammo = game_stats['enemy']['max_ammo']
+        self.enemy.reload_time = game_stats['enemy']['reload_time']
+
+        # Set terrain stats
+        self.chunk_number = game_stats['terrain']['chunk_number']
+        self.heights = game_stats['terrain']['heights']
+        self.chunk_size = game_stats['terrain']['chunk_size']
+
         # Clear all previous level objects
         self.canvas.clear()
         self.clear_widgets()
         self.ground_tiles.clear()
-        self.bullet_group.clear()
-        self.explosion_group.clear()
-        self.obstacle_group.clear()
+        self.bullets.clear()
+        self.explosions.clear()
+        self.obstacles.clear()
+        
+        # Initialize chunks and cell_size
+        self.chunks.clear()
+        self.grid_size_x = self.chunk_number * self.chunk_size - 1
+        self.cell_size = self.width / self.grid_size_x
+        
+        for i in range(self.chunk_number):
+            self.chunks.append({"ground":[], "explosions":[], "bullets":[], "obstacles":[], "x_limit":(((i+1)*self.chunk_size-self.chunk_size)*self.cell_size, ((i+1)*self.chunk_size)*self.cell_size)})
+        
+        # Generate the terrain and initialize the game objects
+        self.draw_background()
+        self.terrain_gen()
+        self.create_tank()
+        self.spawn_enemy()
+                        
+    def regenerate_map(self):
+        # Call store_level_stats before regenerating the map
+        self.store_level_stats()
+        
+        # Clear all previous level objects
+        self.canvas.clear()
+        self.clear_widgets()
+        self.ground_tiles.clear()
+        self.bullets.clear()
+        self.explosions.clear()
+        self.obstacles.clear()
         
         # Generate new parameters for the new map
         self.chunk_number = random.randint(50, 75)
@@ -1003,8 +1157,8 @@ class CannonGame(Widget):
         self.spawn_enemy()
         
         # Randomize enemy stats based on the new level
-        self.randomize_enemy_stats()        
-        
+        self.randomize_enemy_stats()
+                
 #-------------------------------------------------------------------------system functions-------------------------------------------------------------------------#
     def on_size(self, *args):
         
@@ -1016,9 +1170,9 @@ class CannonGame(Widget):
         self.remove_widget(self.tank)
         self.canvas.clear()
         self.ground_tiles.clear()
-        self.bullet_group.clear()
-        self.explosion_group.clear()
-        self.obstacle_group.clear()
+        self.bullets.clear()
+        self.explosions.clear()
+        self.obstacles.clear()
         
         
         self.chunks.clear()
@@ -1095,7 +1249,7 @@ class CannonGame(Widget):
                     enemy_ground_to_render.extend(self.chunks[i + 1]["ground"])
                     enemy_processed_chunks.add(i + 1)
 
-            for bullet in self.bullet_group:
+            for bullet in self.bullets:
                 if self.chunks[i]["x_limit"][0] <= bullet.x <= self.chunks[i]["x_limit"][1] or self.chunks[i]["x_limit"][0] <= bullet.x + bullet.width <= self.chunks[i]["x_limit"][1]:
                     # Check if the current chunk has already been processed
                     if i not in bullet_processed_chunks:
@@ -1110,7 +1264,7 @@ class CannonGame(Widget):
                         bullet_ground_to_render.extend(self.chunks[i + 1]["ground"])
                         bullet_processed_chunks.add(i + 1)
                         
-            for explosion in self.explosion_group:
+            for explosion in self.explosions:
 
                 if (self.chunks[i]["x_limit"][0] <= explosion.x-explosion.radius <= self.chunks[i]["x_limit"][1] 
                     or self.chunks[i]["x_limit"][0] <= explosion.x + explosion.radius <= self.chunks[i]["x_limit"][1]
@@ -1129,7 +1283,7 @@ class CannonGame(Widget):
                         explosions_processed_chunks.add(i + 1)
                         
                                 
-        for explosion in self.explosion_group:
+        for explosion in self.explosions:
             if explosion.radius*2 < explosion.effect_diameter:
                     explosion.increase_explosion_radius()
             else:
@@ -1137,7 +1291,7 @@ class CannonGame(Widget):
                 
                 touching, rect2 = self.check_collision_circle(circle=explosion, rect=self.tank) 
                 if touching:
-                    self.tank.hit()
+                    self.tank.hit(game = self)
                 
                 touching, rect2 = self.check_collision_circle(circle=explosion, rect=self.enemy) 
                 if touching:
@@ -1313,13 +1467,13 @@ class CannonGame(Widget):
 
         #-------------neutral functions --------------------------------        
         #bullet physics
-        for bullet in self.bullet_group:
+        for bullet in self.bullets:
             bullet.trajectory()  # move all the bullets
             
             touching, rect2 = self.check_collision_circle(circle=bullet, rect=self.tank) 
             if touching:
                 if bullet.laser:
-                    self.tank.hit()                    
+                    self.tank.hit(game = self)                    
 
                 bullets_to_remove.append(bullet)
             
@@ -1438,7 +1592,7 @@ class CannonGame(Widget):
                         break  # No need to check further collisions for this bullet if it has already collided  
             
         
-            for obstacle in self.obstacle_group:
+            for obstacle in self.obstacles:
                 if obstacle.gravity and not bullet.laser:
                     obstacle.apply_gravity(bullet=bullet)
                 if obstacle.wormhole:
@@ -1455,18 +1609,18 @@ class CannonGame(Widget):
                             
 
         for bullet in bullets_to_remove:
-            if bullet in self.bullet_group:
+            if bullet in self.bullets:
                 
                 if bullet.laser:
                     for r in bullet.rays:
                         self.canvas.remove(r)
                 else:                
                     bullet.explode(self) # remove bullet
-                self.bullet_group.remove(bullet)
+                self.bullets.remove(bullet)
                 self.remove_widget(bullet)
         
         for explosion in explosions_to_remove:
-            self.explosion_group.remove(explosion)
+            self.explosions.remove(explosion)
             self.remove_widget(explosion)
             
         for ground in ground_to_remove:
@@ -1649,7 +1803,11 @@ class CannonGame(Widget):
 
     def on_key_down(self, keyboard, keycode, text, modifiers):
         self.keys_pressed.add(keycode[1])
-
+        if keycode[1] == 'escape':
+            if App.get_running_app().root.current == 'game':
+                App.get_running_app().switch_to_menu()
+            return True  # Indicate that the key event has been handled
+                            
     def on_key_up(self, keyboard, keycode):
         self.keys_pressed.remove(keycode[1])
         self.keys_up.append(keycode[1])
@@ -1686,9 +1844,6 @@ class HelpWindow(BoxLayout):
 class SaveWindow(BoxLayout):
     pass
 
-class HallWindow(BoxLayout):
-    pass
-
 class OpenScreen(Screen):
     pass
 
@@ -1701,10 +1856,42 @@ class HelpScreen(Screen):
 class SaveScreen(Screen):
     pass
 
-class HallScreen(Screen):
-    pass
+class HallWindow(Screen):
+    def on_pre_enter(self, *args):
+        self.load_scores()
+
+    def load_scores(self):
+        try:
+            with open('scores.json', 'r') as file:
+                scores = json.load(file)
+        except FileNotFoundError:
+            scores = []
+
+        # Sort scores by 'level' descending, then by 'total_shots' ascending
+        top_scores = sorted(scores, key=lambda x: (-x['level'], x['total_shots']))[:6]
+
+        score_labels = [
+            self.ids.score_1,
+            self.ids.score_2,
+            self.ids.score_3,
+            self.ids.score_4,
+            self.ids.score_5,
+            self.ids.score_6
+        ]
+
+        for i, score in enumerate(top_scores):
+            score_labels[i].clear_widgets()
+            label = Label(text=f"Score: {score['level']}    Shots: {score['total_shots']}", color=(1, 1, 1, 1))
+            score_labels[i].add_widget(label)
+
+        # Clear any remaining labels if there are less than 6 scores
+        for i in range(len(top_scores), 6):
+            score_labels[i].clear_widgets()
 
 class GameScreen(Screen):
+    pass
+
+class GameOverScreen(Screen):
     pass
 
 class InterfaceApp(App):
@@ -1714,17 +1901,25 @@ class InterfaceApp(App):
         Builder.load_file('help.kv')
         Builder.load_file('save.kv')
         Builder.load_file('hall.kv')
+        Builder.load_file('game_over.kv')
         self.sm = ScreenManager()
         self.sm.add_widget(OpenScreen(name='open'))
         self.sm.add_widget(MenuScreen(name='menu'))
         self.sm.add_widget(HelpScreen(name='help'))
         self.sm.add_widget(SaveScreen(name='save'))
-        self.sm.add_widget(HallScreen(name='hall'))
+        self.sm.add_widget(HallWindow(name='hall'))
         self.sm.add_widget(GameScreen(name='game'))
+        self.sm.add_widget(GameOverScreen(name='game_over'))
         Window.fullscreen = 'auto'
+        Window.bind(on_key_down=self.on_key_down)
         return self.sm
-    
-    
+
+    def on_key_down(self, window, key, scancode, codepoint, modifier):
+        if key == 27:  # 27 is the keycode for the escape key
+            if self.sm.current != 'game':
+                return True  # Block escape key outside the game screen
+        return False
+
     def switch_to_menu(self):
         self.sm.current = 'menu'
 
@@ -1742,6 +1937,23 @@ class InterfaceApp(App):
         game_screen = self.sm.get_screen('game')
         game_screen.clear_widgets()
         game = CannonGame()
+        game_screen.add_widget(game)
+        fps = 1 / game.fps if game.fps != 0 else 0
+        Clock.schedule_interval(game.update, fps)
+
+    def load_game(self):
+        try:
+            with open('current_level_stats.json', 'r') as file:
+                game_stats = json.load(file)
+        except FileNotFoundError:
+            print("Save file not found.")
+            return
+        
+        self.sm.current = 'game'
+        game_screen = self.sm.get_screen('game')
+        game_screen.clear_widgets()
+        game = CannonGame()
+        game.load_game(game_stats)
         game_screen.add_widget(game)
         fps = 1 / game.fps if game.fps != 0 else 0
         Clock.schedule_interval(game.update, fps)
