@@ -53,6 +53,9 @@ class Obstacle(Widget):
                 circle_color = (1, 1, 1)
             else:
                 circle_color = (0, 0, 0)
+                
+            if wormhole:
+                circle_color = color
 
             # Draw the obstacle (circle)
             Color(*circle_color)
@@ -929,7 +932,7 @@ class CannonGame(Widget):
                         self.add_widget(obstacle)
 
                 elif 11 <= rand <= 12:
-                    radius = random.randint(1, 5)
+                    radius = random.randint(2, 4)
                     height_above_ground = random.randint(2, 6)
 
                     # Generate a gravity obstacle
@@ -946,14 +949,16 @@ class CannonGame(Widget):
 
                 elif 13 <= rand <= 14:
                     # Generate a wormhole obstacle with random height above ground and random radius
+                    
                     height_above_ground = random.randint(5, 10)
-                    radius = random.randint(1, 5)
+                    radius = random.randint(2, 4)
                     wormhole_exit_x = random.randint(0, self.grid_size_x) * self.cell_size
                     wormhole_exit_y = random.randint(0, self.grid_size_y) * self.cell_size
                     
                     if (wormhole_exit_x, wormhole_exit_y) not in wormhole_colors:
                         wormhole_colors[(wormhole_exit_x, wormhole_exit_y)] = (random.random(), random.random(), random.random())
-                    color = wormhole_colors[(wormhole_exit_x, wormhole_exit_y)]
+                    
+                    color = (random.randint(0, 10)*0.1, random.randint(0, 10)*0.1, random.randint(0, 10)*0.1)
 
                     obstacle = Obstacle(
                         cell_size=self.cell_size,
@@ -968,7 +973,7 @@ class CannonGame(Widget):
                     self.add_widget(obstacle)
                 
                 elif 15 <= rand <= 16:
-                    radius = random.randint(1, 5)
+                    radius = random.randint(2, 4)
                     height_above_ground = random.randint(2, 6)
 
                     # Generate a gravity obstacle
