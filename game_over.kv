@@ -1,30 +1,77 @@
 <GameOverScreen>:
     BoxLayout:
+        padding: [200, 300, 200, 25]
         orientation: 'vertical'
         canvas.before:
             Rectangle:
                 pos: self.pos
                 size: self.size
-                source: "./neutra.png"
-        Label:
-            id: game_over_label
-            text: 'Game Over'
-            font_size: 40
-        Label:
-            id: level_label
-            text: 'Level Reached: 0'
-            font_size: 30
-        Label:
-            id: shots_label
-            text: 'Total Shots Fired: 0'
-            font_size: 30
-        Button:
-            text: 'Return to Menu'
-            size_hint_y: None
-            height: '48dp'
-            on_release: app.switch_to_menu()
-        Button:
-            text: 'Exit'
-            size_hint_y: None
-            height: '48dp'
-            on_release: app.close_app()
+                source: "./gameover back.png"
+        Image:
+            source: "./gameover widget.png"
+            pos_hint: {"center_x": 0.5, "center_y": 0.3}
+            size: 1084, 433
+            size_hint: None, None
+        BoxLayout:
+            size_hint: None, None
+            orientation: 'vertical'
+            padding: [150, 300, 100, 50]
+            size: 987, 648
+            pos_hint: {"center_x": 0.5, "center_y": 0.5}
+            canvas.before:
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+                    source: "./gameover second widget.png"
+            BoxLayout:
+                orientation: 'vertical'
+                spacing: 65
+                size_hint_y: None
+                BoxLayout:
+                    pos_hint: {"center_x": 0.5, "center_y": 0.5}
+                    size_hint_y: None
+                    height: 115
+                    canvas.before:
+                        Rectangle:
+                            pos: self.pos
+                            size: 699, 199
+                            source: "./level widget.png"
+                    Label:
+                        id: level_label
+                        size_hint: None, None
+                        size: 300, 100
+                        pos_hint: {"center_x": 0.5, "center_y": 0.6}
+                        text: '0'
+                        font_size: 50
+                BoxLayout:
+                    pos_hint: {"center_x": 0.7, "center_y": 0.5}
+                    size_hint_y: None
+                    height: 100
+                    canvas.before:
+                        Rectangle:
+                            pos: self.pos
+                            size: 499, 173
+                            source: "./shots widget.png"
+                    Label:
+                        id: shots_label
+                        pos: self.pos
+                        pos_hint: {"center_x": 0.2, "center_y": 0.7}
+                        text: '0'
+                        font_size: 50
+            BoxLayout:
+                orientation: 'vertical'
+                spacing: 10
+                Button:
+                    size_hint: None, None
+                    size: 476, 91
+                    pos_hint: {"center_x": 0.45, "center_y": 0.5}
+                    background_normal: "./gameover menu.png"
+                    background_down: "./gameover menu down.png"
+                    on_release: app.switch_to_menu()
+                Button:
+                    size_hint: None, None
+                    size: 476, 91
+                    pos_hint: {"center_x": 0.45, "center_y": 0.5}
+                    background_normal: "./gameover exit.png"
+                    background_down: "./gameover exit down.png"
+                    on_release: app.close_app()
