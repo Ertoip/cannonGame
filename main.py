@@ -555,8 +555,8 @@ class Tank(Widget):
             self.save_score(game.level)
             App.get_running_app().root.current = 'game_over'
             game_over_screen = App.get_running_app().root.get_screen('game_over')
-            game_over_screen.ids.shots_label.text = f'Total Shots Fired: {self.total_shots}'
-            game_over_screen.ids.level_label.text = f'Level Reached: {game.level}'
+            game_over_screen.ids.shots_label.text = f'{self.total_shots}'
+            game_over_screen.ids.level_label.text = f'{game.level}'
             
     def save_score(self, level):
         score_data = {
@@ -747,7 +747,7 @@ class CannonGame(Widget):
         
         self.enemy_weapon = {
             "name": "sniper",
-            "mass": 0.04,
+            "mass": 0.0001,
             "effect_diameter": 5,
             "speed": 2,
             "firerate": 0.0001,
@@ -908,14 +908,28 @@ class CannonGame(Widget):
                 chunk += 1
                 c = 0
 
-            if x % 4 == 0 and x != 0:
+            if x % 4 == 0 and x != 0 and x > 15:
                 rand = random.randint(0, max(100-self.level, 20)) 
                 if rand < 10:
                     # Generate a mirror obstacle
-                    h = self.heights[x] + random.randint(5, 7)
-                    for i in range(10):
+                    h = self.heights[x]
+                    mirror_height = random.randint(10, 20)
+
+                    # Randomly choose if the mirror is reflective (blue) or elastic (red gum)
+                    is_reflective = random.choice([True, False])
+
+                    for i in range(mirror_height):
                         obstacle = Ground()
-                        obstacle_color = Color(0, 0.2, 0.8, 0.4)  # dark brown for obstacles
+
+                        if is_reflective:
+                            obstacle_color = Color(0, 0.2, 0.8, 0.4)  # Reflective: blue
+                            obstacle.reflective = True
+                            obstacle.elastic = False
+                        else:
+                            obstacle_color = Color(0.8, 0.1, 0.1, 0.6)  # Elastic: red gum
+                            obstacle.reflective = False
+                            obstacle.elastic = True
+
                         obstacle.canvas.add(obstacle_color)
                         obstacle_pos_y = (h * self.cell_size + i * self.cell_size)
                         obstacle_rectangle = Rectangle(
@@ -924,16 +938,13 @@ class CannonGame(Widget):
                         obstacle.size = (self.cell_size, self.cell_size)
                         obstacle.pos = ((x * self.cell_size) + x_offset, obstacle_pos_y)
 
-                        obstacle.elastic = True
-                        obstacle.reflective = True
-
                         self.chunks[chunk]["ground"].append(obstacle)
                         self.ground_tiles.add(obstacle)  # Add ground to the group
                         self.add_widget(obstacle)
 
                 elif 11 <= rand <= 12:
-                    radius = random.randint(2, 4)
-                    height_above_ground = random.randint(2, 6)
+                    radius = random.randint(2, 3)
+                    height_above_ground = random.randint(4, 6)
 
                     # Generate a gravity obstacle
                     obstacle = Obstacle(
@@ -942,21 +953,19 @@ class CannonGame(Widget):
                         pos=((x * self.cell_size), (self.heights[x] + height_above_ground) * self.cell_size),
                         radius=radius,
                         effectRadius=radius*3,
-
                     )
                     self.obstacles.add(obstacle)
                     self.add_widget(obstacle)
 
                 elif 13 <= rand <= 14:
                     # Generate a wormhole obstacle with random height above ground and random radius
-                    
                     height_above_ground = random.randint(5, 10)
-                    radius = random.randint(2, 4)
-                    wormhole_exit_x = random.randint(0, self.grid_size_x) * self.cell_size
-                    wormhole_exit_y = random.randint(0, self.grid_size_y) * self.cell_size
+                    radius = random.randint(2, 3)
+                    wormhole_exit_x = (x * self.cell_size) + random.randint(15, 20) * self.cell_size
+                    wormhole_exit_y = ((self.heights[x] + height_above_ground) * self.cell_size) + random.randint(-3, 3) * self.cell_size
                     
-                    if (wormhole_exit_x, wormhole_exit_y) not in wormhole_colors:
-                        wormhole_colors[(wormhole_exit_x, wormhole_exit_y)] = (random.random(), random.random(), random.random())
+                    if wormhole_exit_x > self.grid_size_x * self.cell_size:
+                        wormhole_exit_x = (self.grid_size_x-20) * self.cell_size
                     
                     color = (random.randint(0, 10)*0.1, random.randint(0, 10)*0.1, random.randint(0, 10)*0.1)
 
@@ -971,10 +980,10 @@ class CannonGame(Widget):
                     )
                     self.obstacles.add(obstacle)
                     self.add_widget(obstacle)
-                
+
                 elif 15 <= rand <= 16:
-                    radius = random.randint(2, 4)
-                    height_above_ground = random.randint(2, 6)
+                    radius = random.randint(2, 3)
+                    height_above_ground = random.randint(3, 6)
 
                     # Generate a gravity obstacle
                     obstacle = Obstacle(
@@ -983,14 +992,13 @@ class CannonGame(Widget):
                         pos=((x * self.cell_size), (self.heights[x] + height_above_ground) * self.cell_size),
                         radius=radius,
                         effectRadius=radius*3,
-                        repulsive = True
-
+                        repulsive=True
                     )
                     self.obstacles.add(obstacle)
                     self.add_widget(obstacle)
 
-            x += 1
-                        
+            x += 1  
+                            
     def create_tank(self, new_pos = None):
         weapon = self.weapons[self.current_weapon]
 
@@ -1038,7 +1046,7 @@ class CannonGame(Widget):
         
         # Increase enemy weapon stats based on the current level
         self.enemy_weapon["speed"] = random.uniform(1, 2)
-        self.enemy_weapon["mass"] = random.uniform(0.00, 0.1) / level_multiplier
+        self.enemy_weapon["mass"] = random.uniform(0.01, 0.05) / level_multiplier
         self.enemy_weapon["effect_diameter"] = random.randint(1, 3) * level_multiplier
         self.enemy_weapon["firerate"] = random.uniform(0.1, 0.5) * level_multiplier
         self.enemy_weapon["reload_speed"] = random.uniform(1, 3) * level_multiplier
@@ -1306,7 +1314,7 @@ class CannonGame(Widget):
                         enemy_dead = True                    
                 for ground in explosions_ground_to_render:
                     
-                        if not ground.bulletproof:
+                        if not ground.elastic:
                             touching, rect2 = self.check_collision_circle(circle=explosion, rect=ground) 
                             if touching:
                                 ground_to_remove.append(ground)
