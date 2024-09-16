@@ -162,9 +162,10 @@ class Enemy(Widget):
         super().__init__(**kwargs)
         with self.canvas:
             # Draw the tank body (rectangle)
-            Color(0.1, 0.8, 0.1)
-            self.rect = Rectangle(pos=self.pos, size=self.size)
-            
+            Color(0.9, 0.9, 0.9)
+            self.tank_image_source = "Tank 1 copy.png"
+            self.rect = Rectangle(source=self.tank_image_source, pos=self.pos, size=self.size)
+        
             # Draw the cannon
             self.cannon_length = self.size[1] * 0.3  # Adjust the length of the cannon as needed
             self.cannon_width = self.size[0] * 0.03  # Adjust the width of the cannon as needed
@@ -1311,13 +1312,13 @@ class CannonGame(Widget):
                     self.enemy.hit()
                     if self.enemy.health <= 0:
                         self.level += 1
-                        enemy_dead = True                    
+                        enemy_dead = True    
+                                        
                 for ground in explosions_ground_to_render:
-                    
-                        if not ground.elastic:
-                            touching, rect2 = self.check_collision_circle(circle=explosion, rect=ground) 
-                            if touching:
-                                ground_to_remove.append(ground)
+                    if not ground.elastic and not ground.bulletproof:
+                        touching, rect2 = self.check_collision_circle(circle=explosion, rect=ground) 
+                        if touching:
+                            ground_to_remove.append(ground)
 
                     
         self.tank.draw_preds(self)
