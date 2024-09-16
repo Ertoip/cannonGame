@@ -50,13 +50,13 @@
                 background_down: "./hall of fame down.png"
                 on_release: app.switch_to_hall()
             Button:
-                id: help
+                id: tutorial
                 size_hint: None, None
                 size: 300, 120
                 pos_hint: {"center_x": 0.5, "center_y": 0.5}
-                background_normal: "./new game.png"
+                background_normal: "./tutorial.png"
                 background_down: "./new game down.png"
-                on_release: app.switch_to_help()
+                on_release: app.switch_to_gamecommands()
 
 <MenuScreen>:
     MenuWindow:     

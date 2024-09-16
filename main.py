@@ -1858,6 +1858,30 @@ class HelpWindow(BoxLayout):
 class SaveWindow(BoxLayout):
     pass
 
+class Tutorial1Window(BoxLayout):
+    pass
+
+class Tutorial2Window(BoxLayout):
+    pass
+
+class Tutorial3Window(BoxLayout):
+    pass
+
+class Tutorial4Window(BoxLayout):
+    pass
+
+class Tutorial5Window(BoxLayout):
+    pass
+
+class Tutorial6Window(BoxLayout):
+    pass
+
+class Tutorial7Window(BoxLayout):
+    pass
+
+class GamecommandsWindow(BoxLayout):
+    pass
+
 class OpenScreen(Screen):
     pass
 
@@ -1868,6 +1892,30 @@ class HelpScreen(Screen):
     pass
 
 class SaveScreen(Screen):
+    pass
+
+class Tutorial1Screen(Screen):
+    pass
+
+class Tutorial2Screen(Screen):
+    pass
+
+class Tutorial3Screen(Screen):
+    pass
+
+class Tutorial4Screen(Screen):
+    pass
+
+class Tutorial5Screen(Screen):
+    pass
+
+class Tutorial6Screen(Screen):
+    pass
+
+class Tutorial7Screen(Screen):
+    pass
+
+class GamecommandsScreen(Screen):
     pass
 
 class HallWindow(Screen):
@@ -1916,6 +1964,14 @@ class InterfaceApp(App):
         Builder.load_file('save.kv')
         Builder.load_file('hall.kv')
         Builder.load_file('game_over.kv')
+        Builder.load_file('tutorial1.kv')
+        Builder.load_file('tutorial2.kv')
+        Builder.load_file('tutorial3.kv')
+        Builder.load_file('tutorial4.kv')
+        Builder.load_file('tutorial5.kv')
+        Builder.load_file('tutorial6.kv')
+        Builder.load_file('tutorial7.kv')
+        Builder.load_file('gamecommands.kv')
         self.sm = ScreenManager()
         self.sm.add_widget(OpenScreen(name='open'))
         self.sm.add_widget(MenuScreen(name='menu'))
@@ -1924,6 +1980,14 @@ class InterfaceApp(App):
         self.sm.add_widget(HallWindow(name='hall'))
         self.sm.add_widget(GameScreen(name='game'))
         self.sm.add_widget(GameOverScreen(name='game_over'))
+        self.sm.add_widget(Tutorial1Screen(name='tutorial1'))
+        self.sm.add_widget(Tutorial2Screen(name='tutorial2'))
+        self.sm.add_widget(Tutorial3Screen(name='tutorial3'))
+        self.sm.add_widget(Tutorial4Screen(name='tutorial4'))
+        self.sm.add_widget(Tutorial5Screen(name='tutorial5'))
+        self.sm.add_widget(Tutorial6Screen(name='tutorial6'))
+        self.sm.add_widget(Tutorial7Screen(name='tutorial7'))
+        self.sm.add_widget(GamecommandsScreen(name='gamecommands'))
         Window.fullscreen = 'auto'
         Window.bind(on_key_down=self.on_key_down)
         return self.sm
@@ -1945,6 +2009,31 @@ class InterfaceApp(App):
 
     def switch_to_hall(self):
         self.sm.current = 'hall'
+
+    def switch_to_tutorial1(self):
+        self.sm.current = 'tutorial1'
+
+    def switch_to_tutorial2(self):
+        self.sm.current = 'tutorial2'
+
+    def switch_to_tutorial3(self):
+        self.sm.current = 'tutorial3'
+
+    def switch_to_tutorial4(self):
+        self.sm.current = 'tutorial4'
+
+    def switch_to_tutorial5(self):
+        self.sm.current = 'tutorial5'
+    
+    def switch_to_tutorial6(self):
+        self.sm.current = 'tutorial6'
+
+    def switch_to_tutorial7(self):
+        self.sm.current = 'tutorial7'
+
+    def switch_to_gamecommands(self):
+        self.sm.current = 'gamecommands'
+
 
     def start_new_game(self):
         self.sm.current = 'game'

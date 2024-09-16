@@ -1,0 +1,23 @@
+<Tutorial3Window>:
+    resizable: True
+    FloatLayout:  
+        canvas.before:
+            Rectangle:
+                pos: self.pos
+                size: self.size
+                source: "./neutra.png"   
+        Image:
+            source: "./tutorial 3.png"
+            size_hint: None, None  
+            size: 1500, 850
+            pos_hint: {"center_x": 0.5, "top": 0.9}
+        Button:
+            size_hint: None, None
+            size: 232, 122
+            pos_hint: {'right': 1, 'bottom': 1} 
+            background_normal: "./next.png"
+            background_down: "./next.png"
+            on_release: app.switch_to_tutorial4()
+
+<Tutorial3Screen>:
+    Tutorial3Window:
